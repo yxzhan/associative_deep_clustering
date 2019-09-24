@@ -109,7 +109,8 @@ np.core.arrayprint._line_width = 150
 from semisup.backend import apply_envelope
 from backend import apply_envelope
 import semisup
-from tensorflow.contrib.data import Dataset
+# from tensorflow.contrib.data import Dataset
+Dataset = tf.data.Dataset
 from augment import apply_augmentation
 
 
@@ -203,9 +204,9 @@ def main(_):
         # get multiple augmented versions of the same image - they should later have similar embeddings
         augmented_set = augmented_set.flat_map(lambda x: Dataset.from_tensors(x).repeat(rf))
 
-        augmented_set = augmented_set.map(aug, num_threads=nt, output_buffer_size=b)
+        augmented_set = augmented_set.map(aug)
 
-        dataset = dataset.map(random_crop, num_threads=1, output_buffer_size=b)
+        dataset = dataset.map(random_crop)
         dataset = dataset.repeat().batch(FLAGS.unsup_batch_size)
         augmented_set = augmented_set.repeat().batch(FLAGS.unsup_batch_size * rf)
 
