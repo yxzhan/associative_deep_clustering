@@ -30,7 +30,7 @@ from importlib import import_module
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('virtual_embeddings_per_class', 1,
+flags.DEFINE_integer('virtual_embeddings_per_class', 4,
                      'Number of image centroids per class')
 
 flags.DEFINE_integer('unsup_batch_size', 100,
@@ -69,7 +69,7 @@ flags.DEFINE_float('rwalker_weight', 1.0, 'Weight for reg walker loss.')
 flags.DEFINE_bool('normalize_input', True, 'Normalize input images to be between -1 and 1. Requires tanh autoencoder')
 
 flags.DEFINE_integer('max_steps', 200000, 'Number of training steps.')
-flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 1280, 'Dimension of embedding space')
 flags.DEFINE_integer('taskid', None, 'Id of current task. Will be added to logdir')
 flags.DEFINE_integer('num_blocks', 3, 'Number of blocks in resnet')
 flags.DEFINE_integer('num_augmented_samples', 3, 'Number of augmented samples for each image.')
@@ -86,7 +86,7 @@ flags.DEFINE_float('dropout_keep_prob', 0.8, 'Keep Prop in dropout. Set to 1 to 
 flags.DEFINE_float('zero_fact', 1, 'Used for simulation imbalanced class distribution. Only this fraction of zeros will be used.')
 
 flags.DEFINE_string('logdir', None, 'Where to put the logs. By default, no logs will be saved.')
-flags.DEFINE_string('dataset', 'mnist', 'Which dataset to work on.')
+flags.DEFINE_string('dataset', 'waste', 'Which dataset to work on.')
 flags.DEFINE_string('architecture', 'mnist_model_dropout', 'Which network architecture '
                                                            'from architectures.py to use.' )
 
@@ -113,11 +113,9 @@ import semisup
 # from tensorflow.contrib.data import Dataset
 Dataset = tf.data.Dataset
 from augment import apply_augmentation
-tf.compat.v1.enable_eager_execution()
-test = tf.range(10)
+# tf.compat.v1.enable_eager_execution()
 
 def main(_):
-    FLAGS.eval_interval = 1000  # todo remove
     if FLAGS.logdir is not None:
         if FLAGS.taskid is not None:
             FLAGS.logdir = FLAGS.logdir + '/t_' + str(FLAGS.taskid)
@@ -131,51 +129,15 @@ def main(_):
     IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
     image_shape = IMAGE_SHAPE
 
-    train_images, train_labels_svm = dataset_tools.get_data('train')  # no train labels nowhere
-    test_images, test_labels = dataset_tools.get_data('test')
-
-    if FLAGS.zero_fact < 1:
-        # exclude a random set of zeros (not at the end, then there would be many batches without zeros)
-        keep = np.ones(len(train_labels_svm), dtype=bool)
-        zero_indices = np.where((train_labels_svm == 0))[0]
-
-        remove = np.random.uniform(0, 1, len(zero_indices))
-        zero_indices_to_remove = zero_indices[remove > FLAGS.zero_fact]
-
-        keep[zero_indices_to_remove] = False
-
-        train_images = train_images[keep]
-        train_labels_svm = train_labels_svm[keep]
-
-        print('using only a fraction of zeros, resulting in the following shape:', train_images.shape)
-
-    if FLAGS.num_unlabeled_images > 0:
-        unlabeled_train_images, _ = dataset_tools.get_data('unlabeled', max_num=np.min([FLAGS.num_unlabeled_images, 50000]))
-        train_images = np.vstack([train_images, unlabeled_train_images])
+    train_images, test_images, train_labels_svm, test_labels = dataset_tools.get_data()
 
     if FLAGS.normalize_input:
         train_images = (train_images - 128.) / 128.
         test_images = (test_images - 128.) / 128.
 
-    if FLAGS.use_test:
-        train_images = np.vstack([train_images, test_images])
-        train_labels_svm = np.hstack([train_labels_svm, test_labels])
-
-    #if FLAGS.dataset == 'svhn' and FLAGS.architecture == 'resnet_cifar_model':
-    #  FLAGS.emb_size = 64
-
     image_shape_crop = image_shape
     c_test_imgs = test_images
     c_train_imgs = train_images
-
-    # crop images to some random region. Intuitively, images should belong to the same cluster,
-    # even if a part of the image is missing
-    # (no padding, because the net could detect padding easily, and match it to other augmented samples that have
-    # padding)
-    if FLAGS.dataset == 'stl10':
-        image_shape_crop = [64, 64, 3]
-        c_test_imgs = test_images[:, 16:80, 16:80]
-        c_train_imgs = train_images[:, 16:80, 16:80]
 
     def aug(image):
         return apply_augmentation(image, target_shape=image_shape_crop, params=dataset_tools.augmentation_params)
@@ -191,7 +153,7 @@ def main(_):
         t_images = tf.placeholder("float", shape=[None] + image_shape)
 
         dataset = Dataset.from_tensor_slices(t_images)
-        dataset = dataset.shuffle(buffer_size=10000, seed=47)  # important, so that we have the same images in both sets
+        # dataset = dataset.shuffle(buffer_size=10000, seed=47)  # important, so that we have the same images in both sets
 
         # parameters for buffering during augmentation. Only influence training speed.
         nt = 8 if FLAGS.volta else 4    # that's not even enough, but there are no more CPUs
@@ -200,15 +162,13 @@ def main(_):
         rf = FLAGS.num_augmented_samples
 
         augmented_set = dataset
-        if FLAGS.shuffle_augmented_samples:
-            augmented_set = augmented_set.shuffle(buffer_size=10000, seed=47)
 
         # get multiple augmented versions of the same image - they should later have similar embeddings
         augmented_set = augmented_set.flat_map(lambda x: Dataset.from_tensors(x).repeat(rf))
 
         augmented_set = augmented_set.map(aug)
 
-        dataset = dataset.map(random_crop) # why apply random crop to the batch B
+        # dataset = dataset.map(random_crop) # why apply random crop to the batch B
         dataset = dataset.repeat().batch(FLAGS.unsup_batch_size)
         augmented_set = augmented_set.repeat().batch(FLAGS.unsup_batch_size * rf)
 
@@ -319,8 +279,8 @@ def main(_):
         tf.global_variables_initializer().run()
 
         # The initializer how many time will it run?
-        aaa = sess.run(iterator.initializer, feed_dict={t_images: train_images})
-        raaa = sess.run(reg_iterator.initializer, feed_dict={t_images: train_images})
+        sess.run(iterator.initializer, feed_dict={t_images: train_images})
+        sess.run(reg_iterator.initializer, feed_dict={t_images: train_images})
 
         # optional: init from autoencoder
         if FLAGS.restore_checkpoint is not None:
