@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 DATADIR = data_dirs.waste
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [277, 277, 3]
+IMAGE_SHAPE = [227, 227, 3]
 
 def get_data():
     """Utility for convenient data loading."""
@@ -35,3 +35,11 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+augmentation_params = dict()
+augmentation_params['max_crop_percentage'] = 0.2
+augmentation_params['brightness_max_delta'] = 0.5
+augmentation_params['noise_std'] = 0.05
+augmentation_params['flip'] = True
+augmentation_params['max_rotate_angle'] = 15
