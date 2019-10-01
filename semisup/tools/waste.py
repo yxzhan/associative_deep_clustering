@@ -10,14 +10,17 @@ else:
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
+from skimage import data, color
+from skimage.transform import rescale, resize, downscale_local_mean
+
 DATADIR = data_dirs.waste
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [227, 227, 3]
+IMAGE_SHAPE = [50, 50, 3]
 
 def get_data():
     """Utility for convenient data loading."""
-    X = np.load(DATADIR + '/X.npy').astype('uint8')
+    X = load_image()
     Y = load_label()
     return train_test_split(X, Y, test_size=0.8, random_state=42)
     # return X, X, Y, Y
@@ -29,9 +32,19 @@ def load_label():
 
 
 def main():
-    Xtrain,Xtest, Ytrain, Ytest = get_data()
-    print(Xtrain.shape)    
-    print(Xtest.shape)
+    # Xtrain,Xtest, Ytrain, Ytest = get_data()
+    # print(Xtrain.shape)    
+    # print(Xtest.shape)
+    a = load_image()
+    print(a.shape)
+
+def load_image():
+    images = np.load(DATADIR + '/X.npy').astype('uint8')
+    images_resize = []
+    for image in images:
+        image_resize = resize(image, (IMAGE_SHAPE[0], IMAGE_SHAPE[1]),anti_aliasing=True)*255
+        images_resize.append(image_resize)
+    return np.array(images_resize).astype('uint8')
 
 if __name__ == '__main__':
     main()
