@@ -69,7 +69,7 @@ flags.DEFINE_float('rwalker_weight', 1.0, 'Weight for reg walker loss.')
 flags.DEFINE_bool('normalize_input', True, 'Normalize input images to be between -1 and 1. Requires tanh autoencoder')
 
 flags.DEFINE_integer('max_steps', 200000, 'Number of training steps.')
-flags.DEFINE_integer('emb_size', 1280, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 flags.DEFINE_integer('taskid', None, 'Id of current task. Will be added to logdir')
 flags.DEFINE_integer('num_blocks', 3, 'Number of blocks in resnet')
 flags.DEFINE_integer('num_augmented_samples', 3, 'Number of augmented samples for each image.')
@@ -86,7 +86,7 @@ flags.DEFINE_float('dropout_keep_prob', 0.8, 'Keep Prop in dropout. Set to 1 to 
 flags.DEFINE_float('zero_fact', 1, 'Used for simulation imbalanced class distribution. Only this fraction of zeros will be used.')
 
 flags.DEFINE_string('logdir', None, 'Where to put the logs. By default, no logs will be saved.')
-flags.DEFINE_string('dataset', 'waste', 'Which dataset to work on.')
+flags.DEFINE_string('dataset', 'material', 'Which dataset to work on.')
 flags.DEFINE_string('architecture', 'mnist_model_dropout', 'Which network architecture '
                                                            'from architectures.py to use.' )
 
@@ -130,6 +130,13 @@ def main(_):
     image_shape = IMAGE_SHAPE
 
     train_images, test_images, train_labels_svm, test_labels = dataset_tools.get_data()
+
+    unique, counts = np.unique(train_labels_svm, return_counts=True)
+    print('train:')
+    print(dict(zip(unique, counts)))
+    unique, counts = np.unique(test_labels, return_counts=True)
+    print('test:')    
+    print(dict(zip(unique, counts)))
 
     if FLAGS.normalize_input:
         train_images = (train_images - 128.) / 128.

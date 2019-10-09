@@ -16,7 +16,7 @@ from skimage.transform import rescale, resize, downscale_local_mean
 DATADIR = data_dirs.waste
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [50, 50, 3]
+IMAGE_SHAPE = [28, 28, 3]
 
 def get_data():
     """Utility for convenient data loading."""
@@ -42,9 +42,12 @@ def load_image():
     images = np.load(DATADIR + '/X.npy').astype('uint8')
     images_resize = []
     for image in images:
-        image_resize = resize(image, (IMAGE_SHAPE[0], IMAGE_SHAPE[1]),anti_aliasing=True)*255
-        images_resize.append(image_resize)
+        images_resize.append(resize_img(image))
     return np.array(images_resize).astype('uint8')
+
+def resize_img(img):
+    # return img
+    return resize(img, (IMAGE_SHAPE[0], IMAGE_SHAPE[1]),anti_aliasing=True)*255
 
 if __name__ == '__main__':
     main()
