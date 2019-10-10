@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import random
+import sys
 
 import tensorflow as tf
 
@@ -29,7 +30,7 @@ from importlib import import_module
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('virtual_embeddings_per_class', 4,
+flags.DEFINE_integer('virtual_embeddings_per_class', 1,
                      'Number of image centroids per class')
 
 flags.DEFINE_integer('unsup_batch_size', 100,
@@ -48,8 +49,8 @@ flags.DEFINE_float('decay_steps', 5000, 'Learning rate decay interval in steps.'
 flags.DEFINE_integer('reg_warmup_steps', 1, 'Warmup steps for regularization walker.')
 flags.DEFINE_integer('num_unlabeled_images', 0, 'How many images to use from the unlabeled set.')
 
-flags.DEFINE_float('visit_weight_base', 0.5, 'Weight for visit loss.')
-flags.DEFINE_float('rvisit_weight', 1, 'Weight for reg visit loss.')
+flags.DEFINE_float('visit_weight_base', 0.8, 'Weight for visit loss.')
+flags.DEFINE_float('rvisit_weight', 0.8, 'Weight for reg visit loss.')
 flags.DEFINE_float('reg_decay_factor', 0.2, 'Decay reg weight after kmeans initialization')
 
 flags.DEFINE_float('cluster_association_weight', 1.0, 'Weight for cluster associations.')
@@ -112,7 +113,16 @@ import semisup
 # from tensorflow.contrib.data import Dataset
 Dataset = tf.data.Dataset
 from augment import apply_augmentation
-
+tf.compat.v1.enable_eager_execution()
+test = tf.range(10)
+def my_print(tensor):
+    # sess = tf.compat.v1.Session()
+    # with sess.as_default():
+    #     print_op = tf.print("tensors:", output_stream=sys.stdout)
+    #     with tf.control_dependencies([print_op]):
+    #         tripled_tensor = tensor * 3
+    #         sess.run(tripled_tensor)
+    tf.print(tensor, output_stream=sys.stderr)
 
 def main(_):
     FLAGS.eval_interval = 1000  # todo remove
@@ -206,15 +216,15 @@ def main(_):
 
         augmented_set = augmented_set.map(aug)
 
-        dataset = dataset.map(random_crop)
+        dataset = dataset.map(random_crop) # why apply random crop to the batch B
         dataset = dataset.repeat().batch(FLAGS.unsup_batch_size)
         augmented_set = augmented_set.repeat().batch(FLAGS.unsup_batch_size * rf)
 
         iterator = dataset.make_initializable_iterator()
         reg_iterator = augmented_set.make_initializable_iterator()
 
-        t_unsup_images = iterator.get_next()
-        t_reg_unsup_images = reg_iterator.get_next()
+        t_unsup_images = iterator.get_next() # unaugmented image batch A
+        t_reg_unsup_images = reg_iterator.get_next() # augmented image batch B
 
         model_func = getattr(semisup.architectures, FLAGS.architecture)
 
@@ -224,13 +234,14 @@ def main(_):
                                      normalize_embeddings=FLAGS.normalize_embeddings, beta1=FLAGS.beta1,
                                      beta2=FLAGS.beta2)
 
+        # initialation of centroid variables
         init_virt = []
-        for c in range(num_labels):
+        for c in range(num_labels): # init_virt and shape of centroids and repeat 4 times??
             center = np.random.normal(0, 0.3, size=[1, FLAGS.emb_size])
             noise = np.random.uniform(-0.01, 0.01, size=[FLAGS.virtual_embeddings_per_class, FLAGS.emb_size])
             centroids = noise + center
             init_virt.extend(centroids)
-
+        # centroid variables (stored as tf.variable)
         t_sup_emb = tf.Variable(tf.cast(np.array(init_virt), tf.float32), name="virtual_centroids")
 
         t_sup_labels = tf.constant(
@@ -268,10 +279,12 @@ def main(_):
 
         else:
             t_sup_logit = model.embedding_to_logit(t_sup_emb)
+            # loss assoc,c
             model.add_semisup_loss(
                     t_sup_emb, t_unsup_emb, t_sup_labels,
                     walker_weight=walker_weight, visit_weight=visit_weight,
                     match_scale=FLAGS.scale_match_ab, est_err=True, name='c_association')
+            # loss assoc,aug
             model.reg_loss_aba = model.add_semisup_loss(
                     t_reg_unsup_emb, t_unsup_emb, t_rsup_labels,
                     walker_weight=rwalker_weight, visit_weight=rvisit_weight, match_scale=FLAGS.scale_match_ab, est_err=False, name='aug_association')
@@ -313,8 +326,9 @@ def main(_):
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
 
-        sess.run(iterator.initializer, feed_dict={t_images: train_images})
-        sess.run(reg_iterator.initializer, feed_dict={t_images: train_images})
+        # The initializer how many time will it run?
+        aaa = sess.run(iterator.initializer, feed_dict={t_images: train_images})
+        raaa = sess.run(reg_iterator.initializer, feed_dict={t_images: train_images})
 
         # optional: init from autoencoder
         if FLAGS.restore_checkpoint is not None:
@@ -431,12 +445,12 @@ def main(_):
                 nmi = semisup.calc_nmi(test_pred, test_labels)
 
                 conf_mtx, score = semisup.calc_correct_logit_score(test_pred, test_labels, num_labels)
+                print('Confusion matrix')
                 print(conf_mtx)
                 print('Test error: %.2f %%' % (100 - score * 100))
                 print('Test NMI: %.2f %%' % (nmi * 100))
                 print('Train loss: %.2f ' % train_loss)
                 print('Train loss no fc: %.2f ' % sat_loss)
-                print('Reg loss aba: %.2f ' % reg_loss)
                 print('Estimated Accuracy: %.2f ' % estimated_error)
 
                 sat_score = semisup.calc_sat_score(unsup_emb, reg_unsup_emb)
@@ -450,6 +464,8 @@ def main(_):
                 print('embedding norm', np.mean(e_n))
 
                 k_conf_mtx, k_score = semisup.do_kmeans(embs, test_labels, num_labels)
+                print('k means Confusion matrix')
+
                 print(k_conf_mtx)
                 print('k means score:', k_score)  # sometimes that kmeans is better than the logits
 

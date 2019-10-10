@@ -825,12 +825,14 @@ def mnist_model_dropout(inputs,
             net = slim.conv2d(net, 32, [3, 3], scope='conv1_1')
             net = slim.conv2d(net, 32, [3, 3], scope='conv1_2')
             net = slim.max_pool2d(net, [2, 2], scope='pool1')  # 14
+            # new dropout layer
             net = slim.dropout(net, dropout_keep_prob, is_training=is_training,
                                scope='dropout1')
 
             net = slim.conv2d(net, 64, [3, 3], scope='conv2_1')
             net = slim.conv2d(net, 64, [3, 3], scope='conv2_2')
             net = slim.max_pool2d(net, [2, 2], scope='pool2')  # 7
+            # new dropout layer
             net = slim.dropout(net, dropout_keep_prob, is_training=is_training,
                                scope='dropout2')
 
