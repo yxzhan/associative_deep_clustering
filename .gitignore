@@ -1,7 +1,0 @@
-semisup/data
-
-events.out.tfevents.*
-*.pyc
-__pycache__.
-.ipynb_checkpoints
-.vscode
