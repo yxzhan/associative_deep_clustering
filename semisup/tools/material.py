@@ -13,10 +13,10 @@ from sklearn.model_selection import train_test_split
 from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
 
-DATADIR = data_dirs.waste
+DATADIR = data_dirs.material
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [28, 28, 3]
+IMAGE_SHAPE = [20,20, 3]
 
 def get_data():
     """Utility for convenient data loading."""
@@ -27,7 +27,7 @@ def get_data():
 
 def load_label():
     labels = np.load(DATADIR + '/Y.npy')
-    arr = np.arange(1,6)
+    arr = np.arange(0,5)
     return labels.dot(arr).astype('uint8')
 
 
