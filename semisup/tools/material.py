@@ -1,6 +1,6 @@
 from __future__ import division
 from __future__ import print_function
-
+from pathlib import Path
 import gzip
 import numpy as np
 if __name__ == '__main__':
@@ -17,6 +17,7 @@ DATADIR = data_dirs.material
 
 NUM_LABELS = 5
 IMAGE_SHAPE = [20,20, 3]
+base_path = Path(__file__).parent
 
 def get_data():
     """Utility for convenient data loading."""
@@ -26,7 +27,7 @@ def get_data():
     # return X, X, Y, Y
 
 def load_label():
-    labels = np.load(DATADIR + '/Y.npy')
+    labels = np.load((base_path / '../data/npy/Y.npy').resolve())
     arr = np.arange(0,5)
     return labels.dot(arr).astype('uint8')
 
@@ -38,8 +39,8 @@ def main():
     a = load_image()
     print(a.shape)
 
-def load_image():
-    images = np.load(DATADIR + '/X.npy').astype('uint8')
+def load_image():    
+    images = np.load((base_path / '../data/npy/X.npy').resolve()).astype('uint8')
     images_resize = []
     for image in images:
         images_resize.append(resize_img(image))
