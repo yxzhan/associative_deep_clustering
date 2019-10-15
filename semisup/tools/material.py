@@ -16,31 +16,35 @@ from skimage.transform import rescale, resize, downscale_local_mean
 DATADIR = data_dirs.material
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [20,20, 3]
+IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
+TEST_SIZE = 0.3
 
-def get_data():
+def get_data(one_hot=False):
     """Utility for convenient data loading."""
     X = load_image()
-    Y = load_label()
-    return train_test_split(X, Y, test_size=0.8, random_state=42)
+    Y = load_label(one_hot)
+    return train_test_split(X, Y, test_size=TEST_SIZE, random_state=42)
     # return X, X, Y, Y
 
-def load_label():
+def load_label(one_hot=False):
     labels = np.load((base_path / '../data/npy/Y.npy').resolve())
-    arr = np.arange(0,5)
-    return labels.dot(arr).astype('uint8')
+    if (one_hot):
+        arr = np.arange(1,6)
+        return labels.dot(arr).astype('uint8')
+    else:
+        return labels    
 
 
 def main():
     # Xtrain,Xtest, Ytrain, Ytest = get_data()
-    # print(Xtrain.shape)    
+    # print(Xtrain.shape) 
     # print(Xtest.shape)
-    a = load_image()
+    a = load_label()
     print(a.shape)
 
 def load_image():    
-    images = np.load((base_path / '../data/npy/X.npy').resolve()).astype('uint8')
+    images = np.load((base_path / '../data/npy/X_new.npy').resolve()).astype('uint8')
     images_resize = []
     for image in images:
         images_resize.append(resize_img(image))
