@@ -16,9 +16,9 @@ from skimage.transform import rescale, resize, downscale_local_mean
 DATADIR = data_dirs.material
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [227,227, 3]
+IMAGE_SHAPE = [32,32, 3]
 base_path = Path(__file__).parent
-TEST_SIZE = 0.3
+TEST_SIZE = 0.8
 
 def get_data(one_hot=True):
     """Utility for convenient data loading."""
@@ -29,8 +29,8 @@ def get_data(one_hot=True):
 
 def load_label(one_hot=True):
     labels = np.load((base_path / '../data/npy/Y.npy').resolve())
-    if (!one_hot):
-        arr = np.arange(1,6)
+    if one_hot != True:
+        arr = np.arange(0,5)
         return labels.dot(arr).astype('uint8')
     else:
         return labels    

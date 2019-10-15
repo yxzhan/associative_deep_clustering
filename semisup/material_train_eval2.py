@@ -35,6 +35,8 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('emb_size', 256, 'Dimension of embedding space')
+
 flags.DEFINE_integer('sup_per_class', 2,
                      'Number of labeled samples used per class.')
 
@@ -81,6 +83,7 @@ IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
 
 
 def main(_):
+    # Load image data from npy file
     train_images,test_images, train_labels, test_labels = dataset_tools.get_data()
 
     # Sample labeled training subset.
@@ -98,8 +101,10 @@ def main(_):
 
     graph = tf.Graph()
     with graph.as_default():
-        model = semisup.SemisupModel(semisup.architectures.mnist_model, NUM_LABELS,
-                                     IMAGE_SHAPE, dropout_keep_prob=FLAGS.dropout_keep_prob)
+        model = semisup.SemisupModel(semisup.architectures.stl10_model, NUM_LABELS,
+                                     IMAGE_SHAPE, 
+                                     emb_size=FLAGS.emb_size,
+                                     dropout_keep_prob=FLAGS.dropout_keep_prob)
 
         # Set up inputs.
         t_sup_images, t_sup_labels = semisup.create_per_class_inputs(

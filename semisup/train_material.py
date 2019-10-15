@@ -33,7 +33,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('virtual_embeddings_per_class', 4,
                      'Number of image centroids per class')
 
-flags.DEFINE_integer('unsup_batch_size', 100,
+flags.DEFINE_integer('unsup_batch_size', 2,
                      'Number of unlabeled samples per batch.')
 
 flags.DEFINE_integer('eval_interval', 1000,
@@ -92,7 +92,7 @@ flags.DEFINE_string('architecture', 'mnist_model_dropout', 'Which network archit
 
 flags.DEFINE_string('restore_checkpoint', None, 'restore weights from checkpoint, e.g. some autoencoder pretraining')
 flags.DEFINE_bool('init_with_kmeans', False, 'Initialize centroids using kmeans after reg_warmup_steps steps.')
-flags.DEFINE_bool('normalize_embeddings', False, 'Normalize embeddings (l2 norm = 1)')
+flags.DEFINE_bool('normalize_embeddings', True, 'Normalize embeddings (l2 norm = 1)')
 flags.DEFINE_bool('volta', False, 'Use more CPU for preprocessing to load GPU')
 flags.DEFINE_bool('use_test', False, 'Use Test images as part of training set. Done by a few clustering algorithms')
 flags.DEFINE_float('kmeans_sat_thresh', None, 'Init with kmeans when SAT accuracy > x')
@@ -129,7 +129,7 @@ def main(_):
     IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
     image_shape = IMAGE_SHAPE
 
-    train_images, test_images, train_labels_svm, test_labels = dataset_tools.get_data()
+    train_images, test_images, train_labels_svm, test_labels = dataset_tools.get_data(one_hot=False)
 
     unique, counts = np.unique(train_labels_svm, return_counts=True)
     print('train:')
