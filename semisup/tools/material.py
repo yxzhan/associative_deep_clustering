@@ -20,16 +20,16 @@ IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
 TEST_SIZE = 0.3
 
-def get_data(one_hot=False):
+def get_data(one_hot=True):
     """Utility for convenient data loading."""
     X = load_image()
     Y = load_label(one_hot)
     return train_test_split(X, Y, test_size=TEST_SIZE, random_state=42)
     # return X, X, Y, Y
 
-def load_label(one_hot=False):
+def load_label(one_hot=True):
     labels = np.load((base_path / '../data/npy/Y.npy').resolve())
-    if (one_hot):
+    if (!one_hot):
         arr = np.arange(1,6)
         return labels.dot(arr).astype('uint8')
     else:
