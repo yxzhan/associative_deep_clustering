@@ -3,9 +3,11 @@ and the follow-up works [Associative Domain Adaptation (ICCV 2017)](https://visi
 
 It is implemented with TensorFlow. Please refer to the [TensorFlow documentation](https://www.tensorflow.org/install/) for further information.
 
+Paper 1-2:
 The core functions are implemented in `semisup/backend.py`.
 The files `train.py` and `eval.py` demonstrate how to use them. A quick example is contained in `mnist_train_eval.py`.
 
+Paper 3:
 To run unsupervised (clustering) mode, use the `train_unsup2.py` script. For reference see also our paper. 
 An example command with hyperparameters will be added soon.
 
