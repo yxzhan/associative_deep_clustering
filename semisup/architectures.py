@@ -1258,7 +1258,7 @@ def alexnet_model(inputs,
                         [slim.fully_connected],
                         weights_initializer=trunc_normal(0.005),
                         biases_initializer=init_ops.constant_initializer(0.1)):
-                    net = layers.fully_connected(net, 512, scope='fc6')
+                    net = layers.fully_connected(net, 1024, scope='fc6')
                     net = layers_lib.dropout(
                             net, dropout_keep_prob, is_training=is_training, scope='dropout6')
                     net = layers.fully_connected(net, emb_size, scope='fc7')
