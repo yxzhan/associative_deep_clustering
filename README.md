@@ -6,6 +6,7 @@ It is implemented with TensorFlow. Please refer to the [TensorFlow documentation
 Paper 1-2:
 The core functions are implemented in `semisup/backend.py`.
 The files `train.py` and `eval.py` demonstrate how to use them. A quick example is contained in `mnist_train_eval.py`.
+For our use case "solid waste material", pls use the file material_train_eval2.py and material.py
 
 Paper 3:
 To run unsupervised (clustering) mode, use the `train_unsup2.py` script. For reference see also our paper. 
