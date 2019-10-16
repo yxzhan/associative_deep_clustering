@@ -18,13 +18,12 @@ DATADIR = data_dirs.material
 NUM_LABELS = 5
 IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
-TEST_SIZE = 0.2
 
-def get_data(one_hot=True):
+def get_data(one_hot=True, test_size=0.2):
     """Utility for convenient data loading."""
     X = load_image()
     Y = load_label(one_hot)
-    return train_test_split(X, Y, test_size=TEST_SIZE, random_state=42)
+    return train_test_split(X, Y, test_size=test_size, random_state=42)
     # return X, X, Y, Y
 
 def load_label(one_hot=True):
