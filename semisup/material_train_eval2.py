@@ -46,11 +46,14 @@ flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per
 flags.DEFINE_integer('sup_per_batch', -1,   #-1 -> take all available
                      'Number of labeled samples per class per batch.')
 
-flags.DEFINE_integer('unsup_batch_size', 80,
+flags.DEFINE_integer('unsup_batch_size', 40,
                      'Number of unlabeled samples per batch.')
 
 flags.DEFINE_integer('eval_interval', 500,
                      'Number of steps between evaluations.')
+
+flags.DEFINE_string('architecture', 'alexnet_model', 'Which network architecture '
+                                                           'from architectures.py to use.' )
 
 flags.DEFINE_float('learning_rate', 1e-3, 'Initial learning rate.')
 
@@ -84,7 +87,7 @@ IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
 
 def main(_):
     # Load image data from npy file
-    train_images,test_images, train_labels, test_labels = dataset_tools.get_data()
+    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False)
 
     # Sample labeled training subset.
     if FLAGS.sup_seed >= 0:
@@ -101,7 +104,9 @@ def main(_):
 
     graph = tf.Graph()
     with graph.as_default():
-        model = semisup.SemisupModel(semisup.architectures.stl10_model, NUM_LABELS,
+
+        model_func = getattr(semisup.architectures, FLAGS.architecture)
+        model = semisup.SemisupModel(model_func, NUM_LABELS,
                                      IMAGE_SHAPE, 
                                      emb_size=FLAGS.emb_size,
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)

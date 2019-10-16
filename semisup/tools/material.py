@@ -16,7 +16,7 @@ from skimage.transform import rescale, resize, downscale_local_mean
 DATADIR = data_dirs.material
 
 NUM_LABELS = 5
-IMAGE_SHAPE = [32,32, 3]
+IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
 TEST_SIZE = 0.8
 

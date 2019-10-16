@@ -216,20 +216,20 @@ def stl10_resnet_v2_generator(num_blocks=2, data_format=None):
     inputs = tf.identity(inputs, 'initial_max_pool')
 
     inputs = block_layer(
-        inputs=inputs, filters=32, block_fn=building_block, blocks=num_blocks,
-        strides=1, is_training=is_training, name='block_layer1',
+        inputs=inputs, filters=32, block_fn=_building_block_v1, blocks=num_blocks,
+        strides=1, training=is_training, name='block_layer1',
         data_format=data_format)
     inputs = block_layer(
-        inputs=inputs, filters=64, block_fn=building_block, blocks=num_blocks,
-        strides=1, is_training=is_training, name='block_layer2',
+        inputs=inputs, filters=64, block_fn=_building_block_v1, blocks=num_blocks,
+        strides=1, training=is_training, name='block_layer2',
         data_format=data_format)
     inputs = block_layer(
-        inputs=inputs, filters=128, block_fn=building_block, blocks=num_blocks,
-        strides=2, is_training=is_training, name='block_layer3',
+        inputs=inputs, filters=128, block_fn=_building_block_v1, blocks=num_blocks,
+        strides=2, training=is_training, name='block_layer3',
         data_format=data_format)
     inputs = block_layer(
-        inputs=inputs, filters=256, block_fn=building_block, blocks=num_blocks,
-        strides=2, is_training=is_training, name='block_layer4',
+        inputs=inputs, filters=256, block_fn=_building_block_v1, blocks=num_blocks,
+        strides=2, training=is_training, name='block_layer4',
         data_format=data_format)
 
     inputs = batch_norm_relu(inputs, is_training, data_format)
@@ -1177,13 +1177,15 @@ def vgg16_model_small(inputs, emb_size=128, is_training=True, img_shape=None, ne
 
 def alexnet_model(inputs,
                   is_training=True,
-                  augmentation_function=None,
                   emb_size=128,
                   l2_weight=1e-4,
+                  batch_norm_decay=0.99,
                   img_shape=None,
                   new_shape=None,
-                  image_summary=False,
-                  batch_norm_decay=0.99):
+                  dropout_keep_prob=0.8,
+                  num_blocks=None,
+                  augmentation_function=None,
+                  image_summary=False):
     """Mostly identical to slim.nets.alexnt, except for the reverted fc layers"""
 
     from tensorflow.contrib import layers
@@ -1240,9 +1242,9 @@ def alexnet_model(inputs,
                     [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
                     outputs_collections=[end_points_collection]):
                 net = layers.conv2d(
-                        inputs, 64, [11, 11], 4, padding='VALID', scope='conv1')
+                        inputs, 96, [11, 11], 4, padding='VALID', scope='conv1')
                 net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool1')
-                net = layers.conv2d(net, 192, [5, 5], scope='conv2')
+                net = layers.conv2d(net, 256, [5, 5], scope='conv2')
                 net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool2')
                 net = layers.conv2d(net, 384, [3, 3], scope='conv3')
                 net = layers.conv2d(net, 384, [3, 3], scope='conv4')
@@ -1256,7 +1258,7 @@ def alexnet_model(inputs,
                         [slim.fully_connected],
                         weights_initializer=trunc_normal(0.005),
                         biases_initializer=init_ops.constant_initializer(0.1)):
-                    net = layers.fully_connected(net, 4096, scope='fc6')
+                    net = layers.fully_connected(net, 512, scope='fc6')
                     net = layers_lib.dropout(
                             net, dropout_keep_prob, is_training=is_training, scope='dropout6')
                     net = layers.fully_connected(net, emb_size, scope='fc7')
