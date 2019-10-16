@@ -41,5 +41,4 @@ If you use the code, please cite the paper "Learning by Association - A versatil
 }
 ```
 
-For questions please contact Philip Haeusser (haeusser@cs.tum.edu).
 
