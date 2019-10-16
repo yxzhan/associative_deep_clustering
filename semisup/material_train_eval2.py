@@ -27,7 +27,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import semisup
 
 from tensorflow.python.platform import app
