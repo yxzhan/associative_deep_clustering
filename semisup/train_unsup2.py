@@ -23,7 +23,7 @@ import sys
 
 import tensorflow as tf
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 from tensorflow.python.platform import app
 from tensorflow.python.platform import flags
 from importlib import import_module
