@@ -18,7 +18,7 @@ DATADIR = data_dirs.material
 NUM_LABELS = 5
 IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
-TEST_SIZE = 0.8
+TEST_SIZE = 0.2
 
 def get_data(one_hot=True):
     """Utility for convenient data loading."""

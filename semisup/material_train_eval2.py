@@ -29,6 +29,7 @@ import tensorflow as tf
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import semisup
+from functools import partial
 
 from tensorflow.python.platform import app
 from tensorflow.python.platform import flags
@@ -46,7 +47,7 @@ flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per
 flags.DEFINE_integer('sup_per_batch', -1,   #-1 -> take all available
                      'Number of labeled samples per class per batch.')
 
-flags.DEFINE_integer('unsup_batch_size', 40,
+flags.DEFINE_integer('unsup_batch_size', 10,
                      'Number of unlabeled samples per batch.')
 
 flags.DEFINE_integer('eval_interval', 500,
@@ -76,6 +77,13 @@ flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
 
 flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
+flags.DEFINE_bool('augmentation', True,
+                  'Apply data augmentation during training.')
+
+flags.DEFINE_float('batch_norm_decay', 0.99,
+                   'Batch norm decay factor '
+                   '(only used for STL-10 at the moment.')
+
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
 from tools import material as dataset_tools
@@ -88,6 +96,13 @@ IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
 def main(_):
     # Load image data from npy file
     train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False)
+
+    unique, counts = np.unique(train_labels, return_counts=True)
+    print('train:')
+    print(dict(zip(unique, counts)))
+    unique, counts = np.unique(test_labels, return_counts=True)
+    print('test:')    
+    print(dict(zip(unique, counts)))
 
     # Sample labeled training subset.
     if FLAGS.sup_seed >= 0:
@@ -105,8 +120,36 @@ def main(_):
     graph = tf.Graph()
     with graph.as_default():
 
-        model_func = getattr(semisup.architectures, FLAGS.architecture)
-        model = semisup.SemisupModel(model_func, NUM_LABELS,
+        # Apply augmentation
+        if FLAGS.augmentation:
+            # TODO(haeusser) generalize augmentation
+            def _random_invert(inputs, _):
+                randu = tf.random_uniform(
+                        shape=[FLAGS.sup_per_batch * num_labels], minval=0.,
+                        maxval=1.,
+                        dtype=tf.float32)
+                randu = tf.cast(tf.less(randu, 0.5), tf.float32)
+                randu = tf.expand_dims(randu, 1)
+                randu = tf.expand_dims(randu, 1)
+                randu = tf.expand_dims(randu, 1)
+                inputs = tf.cast(inputs, tf.float32)
+                return tf.abs(inputs - 255 * randu)
+
+            augmentation_function = _random_invert
+        else:
+            augmentation_function = None
+
+
+        # Create function that defines the network.
+        architecture = getattr(semisup.architectures, FLAGS.architecture)
+        model_function = partial(
+                architecture,
+                new_shape=None,
+                img_shape=IMAGE_SHAPE,
+                augmentation_function=augmentation_function,
+                batch_norm_decay=FLAGS.batch_norm_decay,
+                emb_size=FLAGS.emb_size)
+        model = semisup.SemisupModel(model_function, NUM_LABELS,
                                      IMAGE_SHAPE, 
                                      emb_size=FLAGS.emb_size,
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)
