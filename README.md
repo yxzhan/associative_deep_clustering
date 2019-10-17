@@ -21,6 +21,9 @@ export PYTHONPATH=/path/to/tensorflow/models:$PYTHONPATH
 ```
 
 Copy the file `semisup/tools/data_dirs.py.template` to `semisup/tools/data_dirs.py`, adapt the paths and .gitignore this file.
+Add [core]
+	longpaths = true
+to gitconfig in C:\Program Files\Git\mingw64\etc
 
 If you use the code, please cite the paper "Learning by Association - A versatile semi-supervised training method for neural networks" or "Associative Domain Adaptation":
 ```
