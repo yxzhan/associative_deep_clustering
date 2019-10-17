@@ -10,7 +10,7 @@ else:
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
-from skimage import data, color
+#from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
 
 DATADIR = data_dirs.material
