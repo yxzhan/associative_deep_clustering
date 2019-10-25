@@ -1304,17 +1304,71 @@ def alexnet_model(inputs,
                 net = Dropout(0.5)(net)
 
                 net = layers.fully_connected(net, emb_size, scope='fc7')
-                # # Use conv2d instead of fully_connected layers.
-                # with arg_scope(
-                #         [slim.fully_connected],
-                #         weights_initializer=trunc_normal(0.005),
-                #         biases_initializer=init_ops.constant_initializer(0.1)):
-                #     net = layers.fully_connected(net, 1024, scope='fc6')
-                #     net = layers_lib.dropout(
-                #             net, dropout_keep_prob, is_training=is_training, scope='dropout6')
-                #     net = layers.fully_connected(net, emb_size, scope='fc7')
+
+        return net
+
+    def alexnet_v2_no_keras(inputs,
+                   is_training=True,
+                   emb_size=4096,
+                   dropout_keep_prob=0.5,
+                   scope='alexnet_v2'):
+
+        inputs = tf.cast(inputs, tf.float32)
+        if new_shape is not None:
+            shape = new_shape
+            inputs = tf.image.resize_images(
+                    inputs,
+                    tf.constant(new_shape[:2]),
+                    method=tf.image.ResizeMethod.BILINEAR)
+        else:
+            shape = img_shape
+        if is_training and augmentation_function is not None:
+            inputs = augmentation_function(inputs, shape)
+        if image_summary:
+            tf.summary.image('Inputs', inputs, max_outputs=3)
+
+        net = inputs
+        mean = tf.reduce_mean(net, [1, 2], True)
+        std = tf.reduce_mean(tf.square(net - mean), [1, 2], True)
+        net = (net - mean) / (std + 1e-5)
+        inputs = net
+
+        with variable_scope.variable_scope(scope, 'alexnet_v2', [inputs]) as sc:
+            end_points_collection = sc.original_name_scope + '_end_points'
+
+            # Collect outputs for conv2d, fully_connected and max_pool2d.
+            with arg_scope(
+                    [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
+                    outputs_collections=[end_points_collection]):
+                # 1st Convolutional Layer
+                net = layers.conv2d(inputs, 96, [11, 11], 4, padding='VALID', scope='conv1')
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool1', padding='VALID')
+                # 2nd Convolutional Layer
+                net = layers.conv2d(net, 256, [5, 5], 1, scope='conv2', padding='SAME')
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool2', padding='VALID')
+                # 3rd Convolutional Layer
+                net = layers.conv2d(net, 384, [3, 3], 1, scope='conv3', padding='SAME')
+                # 4th Convolutional Layer
+                net = layers.conv2d(net, 384, [3, 3], 1, scope='conv4', padding='SAME')
+                net = layers_lib.batch_norm(net)
+                # 5th Convolutional Layer
+                net = layers.conv2d(net, 256, [3, 3], 1, scope='conv5', padding='SAME')
+                net = layers_lib.batch_norm(net)
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool5', padding='SAME')
+
+                net = slim.flatten(net, scope='flatten')
+
+                # Use conv2d instead of fully_connected layers.
+                with arg_scope(
+                        [slim.fully_connected],
+                        weights_initializer=trunc_normal(0.005),
+                        biases_initializer=init_ops.constant_initializer(0.1)):
+                    net = layers.fully_connected(net, 4096, scope='fc6')
+                    net = layers_lib.dropout(
+                            net, dropout_keep_prob, is_training=is_training, scope='dropout6')
+                    net = layers.fully_connected(net, emb_size, scope='fc7')
 
         return net
 
     with slim.arg_scope(alexnet_v2_arg_scope()):
-        return alexnet_v2(inputs, is_training, emb_size)
+        return alexnet_v2_no_keras(inputs, is_training, emb_size)
