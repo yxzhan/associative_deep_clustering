@@ -26,7 +26,7 @@ from __future__ import print_function
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from semisup.densenet import DenseNet
+from Materialerkennung_Assoziation.associative_deep_clustering.semisup.densenet import DenseNet
 
 from tensorflow import keras
 
@@ -122,7 +122,7 @@ def resnet_cifar_model(inputs,
     return emb
 
 
-from official.resnet.resnet_model import conv2d_fixed_padding, fixed_padding, _bottleneck_block_v1,_building_block_v1,block_layer,batch_norm
+from Materialerkennung_Assoziation.associative_deep_clustering.official.resnet.resnet_model import conv2d_fixed_padding, fixed_padding, _bottleneck_block_v1,_building_block_v1,block_layer,batch_norm
 def mnist_resnet_v2_generator(num_blocks=5, final_pool_size=8, dropout_keep_prob=1, data_format=None):
   """Generator for MNIST resnet model.
      This is ResNet30 for cifar - with a final avg pooling of size 7 instead of 8, as mnist images are slightly smaller (28px vs 32px)

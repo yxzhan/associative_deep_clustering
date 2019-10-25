@@ -1,23 +1,7 @@
 #! /usr/bin/env python
 """
-Copyright 2016 Google Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Association-based semi-supervised training example in MNIST dataset.
-
-Training should reach ~1% error rate on the test set using 100 labeled samples
-in 5000-10000 steps (a few minutes on Titan X GPU)
+ALV: Dataset of solid waste materials
+Paper 1: Learning by association
 
 """
 
@@ -26,9 +10,10 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from Materialerkennung_Assoziation.associative_deep_clustering import semisup
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-import semisup
+
 from functools import partial
 
 from tensorflow.python.platform import app
@@ -86,7 +71,7 @@ flags.DEFINE_float('batch_norm_decay', 0.99,
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
-from tools import material as dataset_tools
+from Materialerkennung_Assoziation.associative_deep_clustering.semisup.tools import material as dataset_tools
 import numpy as np
 
 NUM_LABELS = dataset_tools.NUM_LABELS
@@ -125,9 +110,10 @@ def main(_):
             # TODO(haeusser) generalize augmentation
             def _random_invert(inputs, _):
                 randu = tf.random_uniform(
-                        shape=[FLAGS.sup_per_batch * num_labels], minval=0.,
+                        shape=[FLAGS.sup_per_batch * NUM_LABELS], minval=0.,
                         maxval=1.,
                         dtype=tf.float32)
+                print("HELLO")
                 randu = tf.cast(tf.less(randu, 0.5), tf.float32)
                 randu = tf.expand_dims(randu, 1)
                 randu = tf.expand_dims(randu, 1)
