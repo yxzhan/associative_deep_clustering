@@ -9,8 +9,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import random
 import tensorflow as tf
-from Materialerkennung_Assoziation.associative_deep_clustering import semisup
+import semisup
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -21,9 +22,9 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('emb_size', 256, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 1024, 'Dimension of embedding space')
 
-flags.DEFINE_integer('sup_per_class', 2,
+flags.DEFINE_integer('sup_per_class', 30,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -32,37 +33,37 @@ flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per
 flags.DEFINE_integer('sup_per_batch', -1,   #-1 -> take all available
                      'Number of labeled samples per class per batch.')
 
-flags.DEFINE_integer('unsup_batch_size', 10,
+flags.DEFINE_integer('unsup_batch_size', 30,
                      'Number of unlabeled samples per batch.')
 
-flags.DEFINE_integer('eval_interval', 500,
+flags.DEFINE_integer('eval_interval', 200,
                      'Number of steps between evaluations.')
 
 flags.DEFINE_string('architecture', 'alexnet_model', 'Which network architecture '
                                                            'from architectures.py to use.' )
 
-flags.DEFINE_float('learning_rate', 1e-3, 'Initial learning rate.')
+flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_float('decay_steps', 5000,
+flags.DEFINE_float('decay_steps', 400,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
 
 flags.DEFINE_float('walker_weight', 1.0, 'Weight for walker loss.')
 flags.DEFINE_float('logit_weight', 1.0, 'Weight for logits')
-flags.DEFINE_float('dropout_keep_prob', 1.0, 'Dropout factor.')
+flags.DEFINE_float('dropout_keep_prob', 0.5, 'Dropout factor.')
 flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization')
 
-flags.DEFINE_integer('warmup_steps', 1000, 'Number of training steps.')
+flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
 
 flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
-flags.DEFINE_bool('augmentation', True,
+flags.DEFINE_bool('augmentation', False,
                   'Apply data augmentation during training.')
 
 flags.DEFINE_float('batch_norm_decay', 0.99,
@@ -71,22 +72,28 @@ flags.DEFINE_float('batch_norm_decay', 0.99,
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
-from Materialerkennung_Assoziation.associative_deep_clustering.semisup.tools import material as dataset_tools
+from semisup.tools import material as dataset_tools
+from augment import apply_augmentation
+Dataset = tf.data.Dataset
+
 import numpy as np
 
 NUM_LABELS = dataset_tools.NUM_LABELS
 IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
-
+image_shape = IMAGE_SHAPE
 
 def main(_):
+    if FLAGS.logdir is not None:
+        FLAGS.logdir = FLAGS.logdir + '/t_' + str(random.randint(0,99999))
+
     # Load image data from npy file
-    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False)
+    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=0.2)
 
     unique, counts = np.unique(train_labels, return_counts=True)
     print('train:')
     print(dict(zip(unique, counts)))
     unique, counts = np.unique(test_labels, return_counts=True)
-    print('test:')    
+    print('test:')
     print(dict(zip(unique, counts)))
 
     # Sample labeled training subset.
@@ -100,31 +107,19 @@ def main(_):
     print('Seed:', seed)
     sup_by_label = semisup.sample_by_label(train_images, train_labels,
                                            FLAGS.sup_per_class, NUM_LABELS, seed)
-
+    
+    def aug(image):
+        return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params)
 
     graph = tf.Graph()
     with graph.as_default():
-
         # Apply augmentation
-        if FLAGS.augmentation:
-            # TODO(haeusser) generalize augmentation
-            def _random_invert(inputs, _):
-                randu = tf.random_uniform(
-                        shape=[FLAGS.sup_per_batch * NUM_LABELS], minval=0.,
-                        maxval=1.,
-                        dtype=tf.float32)
-                print("HELLO")
-                randu = tf.cast(tf.less(randu, 0.5), tf.float32)
-                randu = tf.expand_dims(randu, 1)
-                randu = tf.expand_dims(randu, 1)
-                randu = tf.expand_dims(randu, 1)
-                inputs = tf.cast(inputs, tf.float32)
-                return tf.abs(inputs - 255 * randu)
-
-            augmentation_function = _random_invert
-        else:
-            augmentation_function = None
-
+        # t_images = tf.placeholder("float", shape=[None] + image_shape)
+        # dataset = Dataset.from_tensor_slices(t_images)
+        # dataset = dataset.map(aug)
+        # dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
+        # iterator = dataset.make_initializable_iterator()
+        # t_reg_unsup_images = iterator.get_next()
 
         # Create function that defines the network.
         architecture = getattr(semisup.architectures, FLAGS.architecture)
@@ -132,12 +127,14 @@ def main(_):
                 architecture,
                 new_shape=None,
                 img_shape=IMAGE_SHAPE,
-                augmentation_function=augmentation_function,
+                # augmentation_function=augmentation_function,
                 batch_norm_decay=FLAGS.batch_norm_decay,
                 emb_size=FLAGS.emb_size)
+
         model = semisup.SemisupModel(model_function, NUM_LABELS,
                                      IMAGE_SHAPE, 
                                      emb_size=FLAGS.emb_size,
+                                    #  augmentation_function=augmentation_function,
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)
 
         # Set up inputs.
@@ -168,9 +165,13 @@ def main(_):
 
         train_op = model.create_train_op(t_learning_rate)
 
+        if FLAGS.logdir is not None:
+            summary_writer = tf.summary.FileWriter(FLAGS.logdir, graph)
+            saver = tf.train.Saver()
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
+        # sess.run(iterator.initializer, feed_dict={t_images: train_images})
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -182,18 +183,26 @@ def main(_):
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
 
-            _ = sess.run([train_op], {
+            _, train_loss = sess.run([train_op, model.train_loss], {
               t_learning_rate: lr
             })
-            if (step + 1) % FLAGS.eval_interval == 0 or step == 99:
+            if (step + 1) % FLAGS.eval_interval == 0 or step == 99 or step == 0:
+                print('=======================')
                 print('Step: %d' % step)
                 test_pred = model.classify(test_images, sess).argmax(-1)
                 conf_mtx = semisup.confusion_matrix(test_labels, test_pred, NUM_LABELS)
                 test_err = (test_labels != test_pred).mean() * 100
                 print(conf_mtx)
+                print('Target:', dict(zip(unique, counts)))
                 print('Test error: %.2f %%' % test_err)
-                print()
-
+                print('Learning rate:', lr)
+                print('train_loss:', train_loss)
+                print('Image shape:', IMAGE_SHAPE)
+                print('emb_size: ', FLAGS.emb_size)
+                print('sup_per_class: ', FLAGS.sup_per_class)
+                print('unsup_batch_size: ', FLAGS.unsup_batch_size)
+                print('semisup: ', FLAGS.semisup)
+                print('augmentation: ', FLAGS.augmentation)
 
             if step % FLAGS.decay_steps == 0 and step > 0:
                 learning_rate_ = learning_rate_ * FLAGS.decay_factor

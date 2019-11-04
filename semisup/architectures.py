@@ -26,7 +26,7 @@ from __future__ import print_function
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from Materialerkennung_Assoziation.associative_deep_clustering.semisup.densenet import DenseNet
+from semisup.densenet import DenseNet
 
 from tensorflow import keras
 
@@ -122,7 +122,7 @@ def resnet_cifar_model(inputs,
     return emb
 
 
-from Materialerkennung_Assoziation.associative_deep_clustering.official.resnet.resnet_model import conv2d_fixed_padding, fixed_padding, _bottleneck_block_v1,_building_block_v1,block_layer,batch_norm
+from official.resnet.resnet_model import conv2d_fixed_padding, fixed_padding, _bottleneck_block_v1,_building_block_v1,block_layer,batch_norm
 def mnist_resnet_v2_generator(num_blocks=5, final_pool_size=8, dropout_keep_prob=1, data_format=None):
   """Generator for MNIST resnet model.
      This is ResNet30 for cifar - with a final avg pooling of size 7 instead of 8, as mnist images are slightly smaller (28px vs 32px)
@@ -1245,101 +1245,6 @@ def alexnet_model(inputs,
             with arg_scope(
                     [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
                     outputs_collections=[end_points_collection]):
-                # batch normalization
-                net = inputs
-                net = BatchNormalization( \
-                    axis=-1, momentum=0.9, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',\
-                    gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', beta_regularizer=None,\
-                    gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)(net)
-                # 1st Convolutional Layer
-                net = Conv2D(filters=96, \
-                    kernel_size=(11,11), strides=(4,4), padding='valid',\
-                    trainable=False, \
-                    activation = 'relu', \
-                    kernel_initializer='glorot_uniform')(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2),\
-                    trainable=False, \
-                    padding='valid')(net)
-                
-                # 2nd Convolutional Layer
-                net = Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), padding='same', \
-                        trainable=False, \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2), \
-                        trainable=False, \
-                        padding='valid')(net)
-                # 3rd Convolutional Layer
-                net = Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        trainable=False, \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                
-                # 4th Convolutional Layer
-                net = Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                net = BatchNormalization(momentum=0.9)(net)
-
-                # 5th Convolutional Layer
-                net = Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                net = BatchNormalization(momentum=0.9)(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2))(net)
-                # Passing it to a dense layer       
-                net = slim.flatten(net, scope='flatten')
-
-                # 1st Dense Layer
-                net = Dense(1024)(net)
-                net = Activation('relu')(net)
-                net = Dropout(0.5)(net)
-
-                # 2nd Dense Layer
-                net = Dense(512)(net)
-                net = Activation('relu')(net)
-                net = Dropout(0.5)(net)
-
-                net = layers.fully_connected(net, emb_size, scope='fc7')
-
-        return net
-
-    def alexnet_v2_no_keras(inputs,
-                   is_training=True,
-                   emb_size=4096,
-                   dropout_keep_prob=0.5,
-                   scope='alexnet_v2'):
-
-        inputs = tf.cast(inputs, tf.float32)
-        if new_shape is not None:
-            shape = new_shape
-            inputs = tf.image.resize_images(
-                    inputs,
-                    tf.constant(new_shape[:2]),
-                    method=tf.image.ResizeMethod.BILINEAR)
-        else:
-            shape = img_shape
-        if is_training and augmentation_function is not None:
-            inputs = augmentation_function(inputs, shape)
-        if image_summary:
-            tf.summary.image('Inputs', inputs, max_outputs=3)
-
-        net = inputs
-        mean = tf.reduce_mean(net, [1, 2], True)
-        std = tf.reduce_mean(tf.square(net - mean), [1, 2], True)
-        net = (net - mean) / (std + 1e-5)
-        inputs = net
-
-        with variable_scope.variable_scope(scope, 'alexnet_v2', [inputs]) as sc:
-            end_points_collection = sc.original_name_scope + '_end_points'
-
-            # Collect outputs for conv2d, fully_connected and max_pool2d.
-            with arg_scope(
-                    [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
-                    outputs_collections=[end_points_collection]):
                 # 1st Convolutional Layer
                 net = layers.conv2d(inputs, 96, [11, 11], 4, padding='VALID', scope='conv1')
                 net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool1', padding='VALID')
@@ -1350,10 +1255,12 @@ def alexnet_model(inputs,
                 net = layers.conv2d(net, 384, [3, 3], 1, scope='conv3', padding='SAME')
                 # 4th Convolutional Layer
                 net = layers.conv2d(net, 384, [3, 3], 1, scope='conv4', padding='SAME')
-                net = layers_lib.batch_norm(net)
+                net = layers.batch_norm(net, decay=0.9, is_training=is_training, scope='bn1',)
+ 
                 # 5th Convolutional Layer
                 net = layers.conv2d(net, 256, [3, 3], 1, scope='conv5', padding='SAME')
-                net = layers_lib.batch_norm(net)
+                net = layers.batch_norm(net, decay=0.9, is_training=is_training, scope='bn2')
+
                 net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool5', padding='SAME')
 
                 net = slim.flatten(net, scope='flatten')
@@ -1371,4 +1278,4 @@ def alexnet_model(inputs,
         return net
 
     with slim.arg_scope(alexnet_v2_arg_scope()):
-        return alexnet_v2_no_keras(inputs, is_training, emb_size)
+        return alexnet_v2(inputs, is_training, emb_size)
