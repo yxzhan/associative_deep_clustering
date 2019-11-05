@@ -11,7 +11,6 @@ from __future__ import print_function
 
 import random
 import tensorflow as tf
-import semisup
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -22,9 +21,9 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('emb_size', 1024, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
-flags.DEFINE_integer('sup_per_class', 30,
+flags.DEFINE_integer('sup_per_class', 10,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -59,26 +58,27 @@ flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization
 flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
+flags.DEFINE_string('logdir', './', 'Training log path.')
 
-flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', False,
                   'Apply data augmentation during training.')
 
-flags.DEFINE_float('batch_norm_decay', 0.99,
+flags.DEFINE_float('batch_norm_decay', 0.9,
                    'Batch norm decay factor '
                    '(only used for STL-10 at the moment.')
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
+import numpy as np
+import semisup
 from semisup.tools import material as dataset_tools
 from augment import apply_augmentation
 Dataset = tf.data.Dataset
 
-import numpy as np
-
 NUM_LABELS = dataset_tools.NUM_LABELS
+num_labels = NUM_LABELS
 IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
 image_shape = IMAGE_SHAPE
 
@@ -104,22 +104,23 @@ def main(_):
     else:
       seed = np.random.randint(0, 1000)
 
-    print('Seed:', seed)
-    sup_by_label = semisup.sample_by_label(train_images, train_labels,
-                                           FLAGS.sup_per_class, NUM_LABELS, seed)
+    # print('Seed:', seed)
+    # sup_by_label = semisup.sample_by_label(train_images, train_labels,
+    #                                        FLAGS.sup_per_class, NUM_LABELS, seed)
     
-    def aug(image):
-        return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params)
+    def aug(image, label):
+        return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params), label
 
     graph = tf.Graph()
     with graph.as_default():
         # Apply augmentation
-        # t_images = tf.placeholder("float", shape=[None] + image_shape)
-        # dataset = Dataset.from_tensor_slices(t_images)
-        # dataset = dataset.map(aug)
-        # dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
-        # iterator = dataset.make_initializable_iterator()
-        # t_reg_unsup_images = iterator.get_next()
+        t_images = tf.placeholder("float", shape=[None] + image_shape)
+        t_labels = tf.placeholder(train_labels.dtype, shape=[None])
+        dataset = Dataset.from_tensor_slices((t_images, t_labels))
+        dataset = dataset.map(aug)
+        dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
+        iterator = dataset.make_initializable_iterator()
+        d_sup_images, d_sup_labels = iterator.get_next()
 
         # Create function that defines the network.
         architecture = getattr(semisup.architectures, FLAGS.architecture)
@@ -138,11 +139,11 @@ def main(_):
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)
 
         # Set up inputs.
-        t_sup_images, t_sup_labels = semisup.create_per_class_inputs(
-                    sup_by_label, FLAGS.sup_per_batch)
+        # t_sup_images, t_sup_labels = semisup.create_per_class_inputs(
+        #             sup_by_label, FLAGS.sup_per_batch)
 
         # Compute embeddings and logits.
-        t_sup_emb = model.image_to_embedding(t_sup_images)
+        t_sup_emb = model.image_to_embedding(d_sup_images)
         t_sup_logit = model.embedding_to_logit(t_sup_emb)
 
         # Add losses.
@@ -157,7 +158,7 @@ def main(_):
 
             #model.add_emb_regularization(t_unsup_emb, weight=FLAGS.l1_weight)
 
-        model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
+        logit_loss = model.add_logit_loss(t_sup_logit, d_sup_labels, weight=FLAGS.logit_weight)
 
         #model.add_emb_regularization(t_sup_emb, weight=FLAGS.l1_weight)
 
@@ -171,10 +172,7 @@ def main(_):
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
-        # sess.run(iterator.initializer, feed_dict={t_images: train_images})
-
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        sess.run(iterator.initializer, feed_dict={t_images: train_images, t_labels: train_labels})
 
         learning_rate_ = FLAGS.learning_rate
 
@@ -186,6 +184,14 @@ def main(_):
             _, train_loss = sess.run([train_op, model.train_loss], {
               t_learning_rate: lr
             })
+            # sup_images = sess.run(d_sup_images)
+            # sup_labels = sess.run(d_sup_labels)
+            # sup_emb = sess.run(t_sup_emb)
+            # sup_logit = sess.run(t_sup_logit)
+            # logit_loss = sess.run(logit_loss)
+            # train_loss = sess.run(model.train_loss)
+            # _ = sess.run(train_op, {t_learning_rate: lr})
+
             if (step + 1) % FLAGS.eval_interval == 0 or step == 99 or step == 0:
                 print('=======================')
                 print('Step: %d' % step)
@@ -206,24 +212,6 @@ def main(_):
 
             if step % FLAGS.decay_steps == 0 and step > 0:
                 learning_rate_ = learning_rate_ * FLAGS.decay_factor
-
-
-        coord.request_stop()
-        coord.join(threads)
-
-    print('FINAL RESULTS:')
-    print('Test error: %.2f %%' % (test_err))
-    print('final_score', 1 - test_err/100)
-
-    print('@@test_error:%.4f' % (test_err/100))
-    print('@@train_loss:%.4f' % 0)
-    print('@@reg_loss:%.4f' % 0)
-    print('@@estimated_error:%.4f' % 0)
-    print('@@centroid_norm:%.4f' % 0)
-    print('@@emb_norm:%.4f' % 0)
-    print('@@k_score:%.4f' % 0)
-    print('@@svm_score:%.4f' % 0)
-
 
 if __name__ == '__main__':
     app.run()

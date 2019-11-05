@@ -1255,11 +1255,11 @@ def alexnet_model(inputs,
                 net = layers.conv2d(net, 384, [3, 3], 1, scope='conv3', padding='SAME')
                 # 4th Convolutional Layer
                 net = layers.conv2d(net, 384, [3, 3], 1, scope='conv4', padding='SAME')
-                net = layers.batch_norm(net, decay=0.9, is_training=is_training, scope='bn1',)
+                net = layers.batch_norm(net, decay=batch_norm_decay, is_training=is_training, scope='bn1',)
  
                 # 5th Convolutional Layer
                 net = layers.conv2d(net, 256, [3, 3], 1, scope='conv5', padding='SAME')
-                net = layers.batch_norm(net, decay=0.9, is_training=is_training, scope='bn2')
+                net = layers.batch_norm(net, decay=batch_norm_decay, is_training=is_training, scope='bn2')
 
                 net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool5', padding='SAME')
 
