@@ -107,25 +107,13 @@ print("flags:", str(FLAGS.__flags))  # print all flags (useful when logging)
 import numpy as np
 
 np.core.arrayprint._line_width = 150
-from semisup.backend import apply_envelope
 from backend import apply_envelope
 import semisup
 # from tensorflow.contrib.data import Dataset
 Dataset = tf.data.Dataset
 from augment import apply_augmentation
-tf.compat.v1.enable_eager_execution()
-test = tf.range(10)
-def my_print(tensor):
-    # sess = tf.compat.v1.Session()
-    # with sess.as_default():
-    #     print_op = tf.print("tensors:", output_stream=sys.stdout)
-    #     with tf.control_dependencies([print_op]):
-    #         tripled_tensor = tensor * 3
-    #         sess.run(tripled_tensor)
-    tf.print(tensor, output_stream=sys.stderr)
 
 def main(_):
-    FLAGS.eval_interval = 1000  # todo remove
     if FLAGS.logdir is not None:
         if FLAGS.taskid is not None:
             FLAGS.logdir = FLAGS.logdir + '/t_' + str(FLAGS.taskid)

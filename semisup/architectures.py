@@ -1245,74 +1245,35 @@ def alexnet_model(inputs,
             with arg_scope(
                     [layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
                     outputs_collections=[end_points_collection]):
-                # batch normalization
-                net = inputs
-                net = BatchNormalization( \
-                    axis=-1, momentum=0.9, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',\
-                    gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', beta_regularizer=None,\
-                    gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)(net)
                 # 1st Convolutional Layer
-                net = Conv2D(filters=96, \
-                    kernel_size=(11,11), strides=(4,4), padding='valid',\
-                    trainable=False, \
-                    activation = 'relu', \
-                    kernel_initializer='glorot_uniform')(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2),\
-                    trainable=False, \
-                    padding='valid')(net)
-                
+                net = layers.conv2d(inputs, 96, [11, 11], 4, padding='VALID', scope='conv1')
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool1', padding='VALID')
                 # 2nd Convolutional Layer
-                net = Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), padding='same', \
-                        trainable=False, \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2), \
-                        trainable=False, \
-                        padding='valid')(net)
+                net = layers.conv2d(net, 256, [5, 5], 1, scope='conv2', padding='SAME')
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool2', padding='VALID')
                 # 3rd Convolutional Layer
-                net = Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        trainable=False, \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                
+                net = layers.conv2d(net, 384, [3, 3], 1, scope='conv3', padding='SAME')
                 # 4th Convolutional Layer
-                net = Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                net = BatchNormalization(momentum=0.9)(net)
-
+                net = layers.conv2d(net, 384, [3, 3], 1, scope='conv4', padding='SAME')
+                net = layers.batch_norm(net, decay=batch_norm_decay, is_training=is_training, scope='bn1',)
+ 
                 # 5th Convolutional Layer
-                net = Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), padding='same', \
-                        activation = 'relu', \
-                        kernel_initializer='glorot_uniform')(net)
-                net = BatchNormalization(momentum=0.9)(net)
-                # Pooling
-                net = MaxPooling2D(pool_size=(3,3), strides=(2,2))(net)
-                # Passing it to a dense layer       
+                net = layers.conv2d(net, 256, [3, 3], 1, scope='conv5', padding='SAME')
+                net = layers.batch_norm(net, decay=batch_norm_decay, is_training=is_training, scope='bn2')
+
+                net = layers_lib.max_pool2d(net, [3, 3], 2, scope='pool5', padding='SAME')
+
                 net = slim.flatten(net, scope='flatten')
 
-                # 1st Dense Layer
-                net = Dense(1024)(net)
-                net = Activation('relu')(net)
-                net = Dropout(0.5)(net)
-
-                # 2nd Dense Layer
-                net = Dense(512)(net)
-                net = Activation('relu')(net)
-                net = Dropout(0.5)(net)
-
-                net = layers.fully_connected(net, emb_size, scope='fc7')
-                # # Use conv2d instead of fully_connected layers.
-                # with arg_scope(
-                #         [slim.fully_connected],
-                #         weights_initializer=trunc_normal(0.005),
-                #         biases_initializer=init_ops.constant_initializer(0.1)):
-                #     net = layers.fully_connected(net, 1024, scope='fc6')
-                #     net = layers_lib.dropout(
-                #             net, dropout_keep_prob, is_training=is_training, scope='dropout6')
-                #     net = layers.fully_connected(net, emb_size, scope='fc7')
+                # Use conv2d instead of fully_connected layers.
+                with arg_scope(
+                        [slim.fully_connected],
+                        weights_initializer=trunc_normal(0.005),
+                        biases_initializer=init_ops.constant_initializer(0.1)):
+                    net = layers.fully_connected(net, 4096, scope='fc6')
+                    net = layers_lib.dropout(
+                            net, dropout_keep_prob, is_training=is_training, scope='dropout6')
+                    net = layers.fully_connected(net, emb_size, scope='fc7')
 
         return net
 

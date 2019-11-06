@@ -6,7 +6,7 @@ It is implemented with TensorFlow. Please refer to the [TensorFlow documentation
 Paper 1-2:
 The core functions are implemented in `semisup/backend.py`.
 The files `train.py` and `eval.py` demonstrate how to use them. A quick example is contained in `mnist_train_eval.py`.
-For our use case "solid waste material", pls use the file material_train_eval2.py and material.py
+For our use case waste processing, pls use the file material_train_eval2.py and material.py
 
 Paper 3:
 To run unsupervised (clustering) mode, use the `train_unsup2.py` script. For reference see also our paper. 
@@ -21,6 +21,9 @@ export PYTHONPATH=/path/to/tensorflow/models:$PYTHONPATH
 ```
 
 Copy the file `semisup/tools/data_dirs.py.template` to `semisup/tools/data_dirs.py`, adapt the paths and .gitignore this file.
+Add [core]
+	longpaths = true
+to gitconfig in C:\Program Files\Git\mingw64\etc
 
 If you use the code, please cite the paper "Learning by Association - A versatile semi-supervised training method for neural networks" or "Associative Domain Adaptation":
 ```
@@ -41,5 +44,4 @@ If you use the code, please cite the paper "Learning by Association - A versatil
 }
 ```
 
-For questions please contact Philip Haeusser (haeusser@cs.tum.edu).
 

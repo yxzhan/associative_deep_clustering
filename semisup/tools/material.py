@@ -10,7 +10,7 @@ else:
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
-from skimage import data, color
+#from skimage import data, color
 from skimage.transform import rescale, resize, downscale_local_mean
 
 DATADIR = data_dirs.material
@@ -19,11 +19,14 @@ NUM_LABELS = 5
 IMAGE_SHAPE = [227,227, 3]
 base_path = Path(__file__).parent
 
-def get_data(one_hot=True, test_size=0.2):
+def get_data(one_hot=True, test_size=0.2, random_state=10):
     """Utility for convenient data loading."""
     X = load_image()
     Y = load_label(one_hot)
-    return train_test_split(X, Y, test_size=test_size, random_state=42)
+    # if test_size==None:
+    #     return shuffle(X, Y, random_state=random_state), [], []
+    # else:
+    return train_test_split(X, Y, test_size=test_size, random_state=random_state)
     # return X, X, Y, Y
 
 def load_label(one_hot=True):
@@ -43,7 +46,7 @@ def main():
     print(a.shape)
 
 def load_image():    
-    images = np.load((base_path / '../data/npy/X_new.npy').resolve()).astype('uint8')
+    images = np.load((base_path / '../data/npy/X.npy').resolve()).astype('uint8')
     images_resize = []
     for image in images:
         images_resize.append(resize_img(image))
