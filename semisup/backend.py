@@ -152,16 +152,15 @@ def create_per_class_inputs_sub_batch(image_by_class, n_per_class,
 
 def sample_by_label(images, labels, n_per_label, num_labels, seed=None):
     """Extract equal number of sampels per class."""
-    res = []
+    x = []
+    y = []
     rng = np.random.RandomState(seed=seed)
     for i in range(num_labels):
         a = images[labels == i]
-        if n_per_label == -1:  # use all available labeled data
-            res.append(a)
-        else:  # use randomly chosen subset
-            inds = rng.choice(len(a), n_per_label, False)
-            res.append(a[inds])
-    return res
+        inds = rng.choice(len(a), n_per_label, False)
+        x.extend(a[inds])
+        y.extend([i] * n_per_label)
+    return np.asarray(x), np.asarray(y)
 
 
 def create_virt_emb(n, size):
