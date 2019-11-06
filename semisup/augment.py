@@ -22,15 +22,15 @@ def apply_augmentation(image, target_shape, params):
         shape = tf.shape(image)
 
         if "horizontal_move" in ap and ap['horizontal_move']:
-          dir = tf.random_uniform([1],minval=-1,maxval=1,dtype=tf.int32)
-          #dir = dir * tf.random_uniform([1],minval=-1,maxval=1,dtype=tf.int32)  # make zero more likely
+          dir = tf.random.uniform([1],minval=-1,maxval=1,dtype=tf.int32)
+          #dir = dir * tf.random.uniform([1],minval=-1,maxval=1,dtype=tf.int32)  # make zero more likely
 
           print(dir)
           image = tf.contrib.image.translate(image, [ap['horizontal_move'] * tf.cast(dir[0], tf.float32), 0])
 
         # rotation
         if ap['max_rotate_angle'] > 0:
-            angle = tf.random_uniform(
+            angle = tf.random.uniform(
                     [1],
                     minval=-ap['max_rotate_angle'],
                     maxval=ap['max_rotate_angle'],
@@ -44,7 +44,7 @@ def apply_augmentation(image, target_shape, params):
 
         # cropping
         if ap['max_crop_percentage']:
-            crop_percentage = tf.random_uniform(
+            crop_percentage = tf.random.uniform(
                     [1],
                     minval=0,
                     maxval=ap['max_crop_percentage'],
@@ -57,8 +57,8 @@ def apply_augmentation(image, target_shape, params):
             # assert crop_shape.get_shape() == 2, 'crop shape = {}'.format(crop_shape)
             x = tf.cast(crop_shape, tf.int32)
             cropped_h, cropped_w, _ = tf.unstack(x)
-            image = tf.random_crop(image, [cropped_h, cropped_w, target_shape[2]])
-            image = tf.image.resize_images(image, target_shape[:2], method=ResizeMethod.NEAREST_NEIGHBOR)
+            image = tf.image.random_crop(image, [cropped_h, cropped_w, target_shape[2]])
+            image = tf.image.resize(image, target_shape[:2], method=ResizeMethod.NEAREST_NEIGHBOR)
 
         if "flip" in ap and ap['flip']:
             image = tf.image.random_flip_left_right(image)
@@ -75,10 +75,10 @@ def apply_augmentation(image, target_shape, params):
         if "hue_max_delta" in ap:
             image = tf.image.random_hue(image, max_delta=ap["hue_max_delta"])
 
-        noise = tf.random_normal(shape=target_shape, mean=0.0, stddev=ap['noise_std'], dtype=tf.float32)
+        noise = tf.random.normal(shape=target_shape, mean=0.0, stddev=ap['noise_std'], dtype=tf.float32)
         image = image + noise
 
         image.set_shape(target_shape)
 
-        image = tf.clip_by_value(image, -1., 1.)
+        # image = tf.clip_by_value(image, -1., 1.)
     return image

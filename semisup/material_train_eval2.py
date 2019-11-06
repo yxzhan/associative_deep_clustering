@@ -23,6 +23,8 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
+flags.DEFINE_float('test_size', 0.3, 'Test data portion')
+
 flags.DEFINE_integer('sup_per_class', 10,
                      'Number of labeled samples used per class.')
 
@@ -45,7 +47,7 @@ flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_float('decay_steps', 400,
+flags.DEFINE_float('decay_steps', 1000,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
@@ -58,11 +60,11 @@ flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization
 flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', './', 'Training log path.')
+flags.DEFINE_string('logdir', None, 'Training log path.')
 
 flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 
-flags.DEFINE_bool('augmentation', False,
+flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
 
 flags.DEFINE_float('batch_norm_decay', 0.9,
@@ -87,7 +89,7 @@ def main(_):
         FLAGS.logdir = FLAGS.logdir + '/t_' + str(random.randint(0,99999))
 
     # Load image data from npy file
-    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=0.2)
+    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=FLAGS.test_size)
 
     unique, counts = np.unique(train_labels, return_counts=True)
     print('train:')
@@ -104,46 +106,46 @@ def main(_):
     else:
       seed = np.random.randint(0, 1000)
 
-    # print('Seed:', seed)
-    # sup_by_label = semisup.sample_by_label(train_images, train_labels,
-    #                                        FLAGS.sup_per_class, NUM_LABELS, seed)
+    print('Seed:', seed)
+    sup_by_label = semisup.sample_by_label(train_images, train_labels,
+                                           FLAGS.sup_per_class, NUM_LABELS, seed)
     
     def aug(image, label):
         return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params), label
 
     graph = tf.Graph()
     with graph.as_default():
-        # Apply augmentation
-        t_images = tf.placeholder("float", shape=[None] + image_shape)
-        t_labels = tf.placeholder(train_labels.dtype, shape=[None])
-        dataset = Dataset.from_tensor_slices((t_images, t_labels))
-        dataset = dataset.map(aug)
-        dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
-        iterator = dataset.make_initializable_iterator()
-        d_sup_images, d_sup_labels = iterator.get_next()
-
         # Create function that defines the network.
         architecture = getattr(semisup.architectures, FLAGS.architecture)
         model_function = partial(
                 architecture,
                 new_shape=None,
                 img_shape=IMAGE_SHAPE,
-                # augmentation_function=augmentation_function,
                 batch_norm_decay=FLAGS.batch_norm_decay,
                 emb_size=FLAGS.emb_size)
 
         model = semisup.SemisupModel(model_function, NUM_LABELS,
                                      IMAGE_SHAPE, 
                                      emb_size=FLAGS.emb_size,
-                                    #  augmentation_function=augmentation_function,
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)
 
+
         # Set up inputs.
+        t_images = tf.placeholder("float", shape=[None] + image_shape)
+        t_labels = tf.placeholder(train_labels.dtype, shape=[None])
+        dataset = Dataset.from_tensor_slices((t_images, t_labels))
+        # Apply augmentation
+        if FLAGS.augmentation:
+            dataset = dataset.map(aug)
+        dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
+        iterator = dataset.make_initializable_iterator()
+        t_sup_images, t_sup_labels = iterator.get_next()
+
         # t_sup_images, t_sup_labels = semisup.create_per_class_inputs(
         #             sup_by_label, FLAGS.sup_per_batch)
 
         # Compute embeddings and logits.
-        t_sup_emb = model.image_to_embedding(d_sup_images)
+        t_sup_emb = model.image_to_embedding(t_sup_images)
         t_sup_logit = model.embedding_to_logit(t_sup_emb)
 
         # Add losses.
@@ -158,7 +160,7 @@ def main(_):
 
             #model.add_emb_regularization(t_unsup_emb, weight=FLAGS.l1_weight)
 
-        logit_loss = model.add_logit_loss(t_sup_logit, d_sup_labels, weight=FLAGS.logit_weight)
+        logit_loss = model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
 
         #model.add_emb_regularization(t_sup_emb, weight=FLAGS.l1_weight)
 
