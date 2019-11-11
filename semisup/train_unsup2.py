@@ -314,7 +314,6 @@ def main(_):
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
 
-        # The initializer how many time will it run?
         aaa = sess.run(iterator.initializer, feed_dict={t_images: train_images})
         raaa = sess.run(reg_iterator.initializer, feed_dict={t_images: train_images})
 
