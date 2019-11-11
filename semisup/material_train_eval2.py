@@ -8,6 +8,7 @@ Paper 1: Learning by association
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from datetime import datetime
 
 import random
 import tensorflow as tf
@@ -21,13 +22,13 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-IMAGE_SHAPE = [227, 227, 3]
+IMAGE_SHAPE = [96, 96, 3]
 
 flags.DEFINE_integer('emb_size', 512, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 20,
+flags.DEFINE_integer('sup_per_class', 5,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -36,7 +37,7 @@ flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per
 flags.DEFINE_integer('sup_per_batch', -1,   #-1 -> take all available
                      'Number of labeled samples per class per batch.')
 
-flags.DEFINE_integer('unsup_batch_size', 50,
+flags.DEFINE_integer('unsup_batch_size', 30,
                      'Number of unlabeled samples per batch.')
 
 flags.DEFINE_integer('eval_interval', 500,
@@ -62,9 +63,9 @@ flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization
 flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', None, 'Training log path.')
+flags.DEFINE_string('logdir', './', 'Training log path.')
 
-flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
@@ -86,7 +87,7 @@ image_shape = IMAGE_SHAPE
 
 def main(_):
     if FLAGS.logdir is not None:
-        FLAGS.logdir = FLAGS.logdir + '/t_' + str(random.randint(0,99999))
+        FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
 
     # Load image data from npy file
     train_images, test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=FLAGS.test_size, image_shape=image_shape)
@@ -164,6 +165,8 @@ def main(_):
 
         train_op = model.create_train_op(t_learning_rate)
 
+        summary_op = tf.summary.merge_all()
+
         if FLAGS.logdir is not None:
             summary_writer = tf.summary.FileWriter(FLAGS.logdir, graph)
             saver = tf.train.Saver()
@@ -184,7 +187,7 @@ def main(_):
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
             
-            _, train_loss, semi_loss, logit_loss = sess.run([train_op, model.train_loss, model.loss_aba, t_logit_loss], {
+            _, summaries, train_loss, semi_loss, logit_loss = sess.run([train_op, summary_op, model.train_loss, model.loss_aba, t_logit_loss], {
               t_learning_rate: lr
             })
             # sup_images = sess.run(d_sup_images)
@@ -215,6 +218,22 @@ def main(_):
                     print('unsup_batch_size: ', FLAGS.unsup_batch_size)
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
+
+                if FLAGS.logdir is not None:
+                    sum_values = {
+                        'Test error:': test_err,
+                        # 'Learning rate': lr,
+                        # 'train_loss': train_loss,
+                        # 'semi_loss': semi_loss,
+                        'logit_loss': logit_loss
+                    }
+
+                    summary_writer.add_summary(summaries, step)
+                    for key, value in sum_values.items():
+                        summary = tf.Summary(
+                                value=[tf.Summary.Value(tag=key, simple_value=value)])
+                        summary_writer.add_summary(summary, step)
+
 
             if step % FLAGS.decay_steps == 0 and step > 0:
                 learning_rate_ = learning_rate_ * FLAGS.decay_factor
