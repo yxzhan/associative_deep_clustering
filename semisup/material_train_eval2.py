@@ -21,11 +21,13 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
+IMAGE_SHAPE = [227, 227, 3]
+
+flags.DEFINE_integer('emb_size', 512, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 10,
+flags.DEFINE_integer('sup_per_class', 20,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -34,10 +36,10 @@ flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per
 flags.DEFINE_integer('sup_per_batch', -1,   #-1 -> take all available
                      'Number of labeled samples per class per batch.')
 
-flags.DEFINE_integer('unsup_batch_size', 30,
+flags.DEFINE_integer('unsup_batch_size', 50,
                      'Number of unlabeled samples per batch.')
 
-flags.DEFINE_integer('eval_interval', 200,
+flags.DEFINE_integer('eval_interval', 500,
                      'Number of steps between evaluations.')
 
 flags.DEFINE_string('architecture', 'alexnet_model', 'Which network architecture '
@@ -67,9 +69,7 @@ flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
 
-flags.DEFINE_float('batch_norm_decay', 0.9,
-                   'Batch norm decay factor '
-                   '(only used for STL-10 at the moment.')
+flags.DEFINE_float('batch_norm_decay', 0.9, 'Batch norm decay factor ')
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
@@ -81,7 +81,7 @@ Dataset = tf.data.Dataset
 
 NUM_LABELS = dataset_tools.NUM_LABELS
 num_labels = NUM_LABELS
-IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
+# IMAGE_SHAPE = dataset_tools.IMAGE_SHAPE
 image_shape = IMAGE_SHAPE
 
 def main(_):
@@ -89,29 +89,19 @@ def main(_):
         FLAGS.logdir = FLAGS.logdir + '/t_' + str(random.randint(0,99999))
 
     # Load image data from npy file
-    train_images,test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=FLAGS.test_size)
+    train_images, test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=FLAGS.test_size, image_shape=image_shape)
 
-    unique, counts = np.unique(train_labels, return_counts=True)
-    print('train:')
-    print(dict(zip(unique, counts)))
     unique, counts = np.unique(test_labels, return_counts=True)
-    print('test:')
-    print(dict(zip(unique, counts)))
+    testset_distribution = dict(zip(unique, counts))
 
-    # Sample labeled training subset.
-    if FLAGS.sup_seed >= 0:
-      seed = FLAGS.sup_seed
-    elif FLAGS.sup_seed == -2:
-      seed = FLAGS.sup_per_class
-    else:
-      seed = np.random.randint(0, 1000)
+    train_X, train_Y = semisup.sample_by_label(train_images, train_labels,
+                                           FLAGS.sup_per_class, NUM_LABELS, np.random.randint(0, 100))
 
-    print('Seed:', seed)
-    sup_by_label = semisup.sample_by_label(train_images, train_labels,
-                                           FLAGS.sup_per_class, NUM_LABELS, seed)
-    
     def aug(image, label):
         return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params), label
+
+    def aug_unsup(image):
+        return apply_augmentation(image, target_shape=image_shape, params=dataset_tools.augmentation_params)
 
     graph = tf.Graph()
     with graph.as_default():
@@ -129,20 +119,17 @@ def main(_):
                                      emb_size=FLAGS.emb_size,
                                      dropout_keep_prob=FLAGS.dropout_keep_prob)
 
-
-        # Set up inputs.
+        # Set up supervised inputs.
         t_images = tf.placeholder("float", shape=[None] + image_shape)
         t_labels = tf.placeholder(train_labels.dtype, shape=[None])
         dataset = Dataset.from_tensor_slices((t_images, t_labels))
         # Apply augmentation
         if FLAGS.augmentation:
             dataset = dataset.map(aug)
+        dataset = dataset.shuffle(buffer_size=FLAGS.sup_per_class * NUM_LABELS)
         dataset = dataset.repeat().batch(FLAGS.sup_per_class * NUM_LABELS)
         iterator = dataset.make_initializable_iterator()
         t_sup_images, t_sup_labels = iterator.get_next()
-
-        # t_sup_images, t_sup_labels = semisup.create_per_class_inputs(
-        #             sup_by_label, FLAGS.sup_per_batch)
 
         # Compute embeddings and logits.
         t_sup_emb = model.image_to_embedding(t_sup_images)
@@ -150,8 +137,15 @@ def main(_):
 
         # Add losses.
         if FLAGS.semisup:
-            t_unsup_images, _ = semisup.create_input(train_images, train_labels,
-                                                         FLAGS.unsup_batch_size)
+            unsup_t_images = tf.placeholder("float", shape=[None] + image_shape)
+            unsup_dataset = Dataset.from_tensor_slices(unsup_t_images)
+            # Apply augmentation
+            if FLAGS.augmentation:
+                unsup_dataset = unsup_dataset.map(aug_unsup)
+            unsup_dataset = unsup_dataset.shuffle(buffer_size=FLAGS.unsup_batch_size)
+            unsup_dataset = unsup_dataset.repeat().batch(FLAGS.unsup_batch_size)
+            unsup_iterator = unsup_dataset.make_initializable_iterator()
+            t_unsup_images = unsup_iterator.get_next()
 
             t_unsup_emb = model.image_to_embedding(t_unsup_images)
             model.add_semisup_loss(
@@ -159,8 +153,10 @@ def main(_):
                     walker_weight=FLAGS.walker_weight, visit_weight=FLAGS.visit_weight)
 
             #model.add_emb_regularization(t_unsup_emb, weight=FLAGS.l1_weight)
+        else:
+            model.loss_aba = tf.constant(0)
 
-        logit_loss = model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
+        t_logit_loss = model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
 
         #model.add_emb_regularization(t_sup_emb, weight=FLAGS.l1_weight)
 
@@ -173,8 +169,13 @@ def main(_):
             saver = tf.train.Saver()
 
     with tf.Session(graph=graph) as sess:
+
+        sess.run(iterator.initializer, feed_dict={t_images: train_X, t_labels: train_Y})
+        if FLAGS.semisup:
+            sess.run(unsup_iterator.initializer, feed_dict={unsup_t_images: train_images})
+
         tf.global_variables_initializer().run()
-        sess.run(iterator.initializer, feed_dict={t_images: train_images, t_labels: train_labels})
+
 
         learning_rate_ = FLAGS.learning_rate
 
@@ -182,8 +183,8 @@ def main(_):
             lr = learning_rate_
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
-
-            _, train_loss = sess.run([train_op, model.train_loss], {
+            
+            _, train_loss, semi_loss, logit_loss = sess.run([train_op, model.train_loss, model.loss_aba, t_logit_loss], {
               t_learning_rate: lr
             })
             # sup_images = sess.run(d_sup_images)
@@ -201,14 +202,17 @@ def main(_):
                 conf_mtx = semisup.confusion_matrix(test_labels, test_pred, NUM_LABELS)
                 test_err = (test_labels != test_pred).mean() * 100
                 print(conf_mtx)
-                print('Target:', dict(zip(unique, counts)))
+                print('Target:', testset_distribution)
                 print('Test error: %.2f %%' % test_err)
                 print('Learning rate:', lr)
                 print('train_loss:', train_loss)
+                print('semi_loss:', semi_loss)
+                print('logit_loss:', logit_loss)
                 print('Image shape:', IMAGE_SHAPE)
                 print('emb_size: ', FLAGS.emb_size)
                 print('sup_per_class: ', FLAGS.sup_per_class)
-                print('unsup_batch_size: ', FLAGS.unsup_batch_size)
+                if FLAGS.semisup:
+                    print('unsup_batch_size: ', FLAGS.unsup_batch_size)
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
 
