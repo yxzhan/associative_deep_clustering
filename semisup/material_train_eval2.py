@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 
 IMAGE_SHAPE = [227, 227, 3]
 
-flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 256, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
@@ -52,7 +52,7 @@ flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_float('decay_steps', 1000,
+flags.DEFINE_float('decay_steps', 3000,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
@@ -91,8 +91,9 @@ def main(_):
     if FLAGS.logdir is not None:
         # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
-        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_warm{5}".format(FLAGS.logdir, image_shape[0], 
+        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}decay{5}_warm{6}".format(FLAGS.logdir, image_shape[0], 
                                             FLAGS.emb_size, FLAGS.sup_per_class,
+                                            FLAGS.decay_steps,
                                             _unsup_batch_size, FLAGS.warmup_steps)
 
 
@@ -230,6 +231,7 @@ def main(_):
                     print('unsup_batch_size: ', FLAGS.unsup_batch_size)
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
+                print('decay_steps: ', FLAGS.decay_steps)
                 print('warmup_steps: ', FLAGS.warmup_steps)
                 print('=======================\n')
 
