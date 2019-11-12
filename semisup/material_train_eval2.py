@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 
 IMAGE_SHAPE = [227, 227, 3]
 
-flags.DEFINE_integer('emb_size', 512, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
