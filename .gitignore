@@ -5,3 +5,4 @@ events.out.tfevents.*
 __pycache__.
 .ipynb_checkpoints
 .vscode
+*.log
