@@ -91,7 +91,9 @@ def main(_):
     if FLAGS.logdir is not None:
         # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
-        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}".format(FLAGS.logdir, image_shape[0], FLAGS.emb_size, FLAGS.sup_per_class, _unsup_batch_size)
+        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_warm{5}".format(FLAGS.logdir, image_shape[0], 
+                                            FLAGS.emb_size, FLAGS.sup_per_class,
+                                            _unsup_batch_size, FLAGS.warmup_steps)
 
 
     # Load image data from npy file
@@ -228,6 +230,7 @@ def main(_):
                     print('unsup_batch_size: ', FLAGS.unsup_batch_size)
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
+                print('warmup_steps: ', FLAGS.warmup_steps)
                 print('=======================\n')
 
 
