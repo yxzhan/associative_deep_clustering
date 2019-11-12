@@ -14,6 +14,7 @@ import sys
 import time
 import random
 import tensorflow as tf
+import shutil
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -26,11 +27,11 @@ FLAGS = flags.FLAGS
 
 IMAGE_SHAPE = [227, 227, 3]
 
-flags.DEFINE_integer('emb_size', 256, 'Dimension of embedding space')
+flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 10,
+flags.DEFINE_integer('sup_per_class', 30,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -52,7 +53,7 @@ flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_float('decay_steps', 3000,
+flags.DEFINE_integer('decay_steps', 1000,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
@@ -66,6 +67,7 @@ flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 10000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', '../', 'Training log path.')
+flags.DEFINE_bool('run_in_background', False, 'run in background')
 
 flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
@@ -91,10 +93,14 @@ def main(_):
     if FLAGS.logdir is not None:
         # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
-        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}decay{5}_warm{6}".format(FLAGS.logdir, image_shape[0], 
+        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_decay{5}_warm{6}".format(FLAGS.logdir, image_shape[0], 
                                             FLAGS.emb_size, FLAGS.sup_per_class,
-                                            FLAGS.decay_steps,
-                                            _unsup_batch_size, FLAGS.warmup_steps)
+                                            _unsup_batch_size, FLAGS.decay_steps,
+                                            FLAGS.warmup_steps)
+        try:
+            shutil.rmtree(FLAGS.logdir)
+        except OSError as e:
+            print ("Error: %s - %s." % (e.filename, e.strerror))
 
 
     # Load image data from npy file
@@ -200,8 +206,9 @@ def main(_):
               t_learning_rate: lr
             })
 
-            sys.stdout.write("\rstep: %d, Step time: %.4f sec" % (step, (time.time() - step_start_time)))
-            sys.stdout.flush()
+            if not FLAGS.run_in_background:
+                sys.stderr.write("\rstep: %d, Step time: %.4f sec" % (step, (time.time() - step_start_time)))
+                sys.stdout.flush()
             # sup_images = sess.run(d_sup_images)
             # sup_labels = sess.run(d_sup_labels)
             # sup_emb = sess.run(t_sup_emb)
@@ -232,13 +239,14 @@ def main(_):
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
                 print('decay_steps: ', FLAGS.decay_steps)
+                print('decay_factor: ', FLAGS.decay_factor)
                 print('warmup_steps: ', FLAGS.warmup_steps)
                 print('=======================\n')
 
 
                 if FLAGS.logdir is not None:
                     sum_values = {
-                        'Test error:': test_err,
+                        'Test error': test_err,
                         # 'Learning rate': lr,
                         # 'train_loss': train_loss,
                         # 'semi_loss': semi_loss,
