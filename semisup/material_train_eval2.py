@@ -51,7 +51,7 @@ flags.DEFINE_string('architecture', 'alexnet_model', 'Which network architecture
 
 flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
-flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
+flags.DEFINE_float('decay_factor', 0.6, 'Learning rate decay factor.')
 
 flags.DEFINE_integer('decay_steps', 1000,
                    'Learning rate decay interval in steps.')
@@ -93,10 +93,10 @@ def main(_):
     if FLAGS.logdir is not None:
         # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
-        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_decay{5}_warm{6}".format(FLAGS.logdir, image_shape[0], 
+        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_decay{5}_{6}_warm{7}".format(FLAGS.logdir, image_shape[0], 
                                             FLAGS.emb_size, FLAGS.sup_per_class,
                                             _unsup_batch_size, FLAGS.decay_steps,
-                                            FLAGS.warmup_steps)
+                                            int(FLAGS.decay_factor*100), FLAGS.warmup_steps)
         try:
             shutil.rmtree(FLAGS.logdir)
         except OSError as e:
