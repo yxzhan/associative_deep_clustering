@@ -202,7 +202,9 @@ def main(_):
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
             
             step_start_time = time.time()
-            _, summaries, train_loss, semi_loss, logit_loss = sess.run([train_op, summary_op, model.train_loss, model.loss_aba, t_logit_loss], {
+            _, summaries, train_loss, aba_loss, visit_loss, logit_loss = sess.run([train_op, summary_op, 
+                                                    model.train_loss, model.loss_aba, 
+                                                    model.visit_loss, t_logit_loss], {
               t_learning_rate: lr
             })
 
@@ -226,10 +228,11 @@ def main(_):
                 test_err = (test_labels != test_pred).mean() * 100
                 print(conf_mtx)
                 print('Target:', testset_distribution)
-                print('Test error: %.2f %%' % test_err)
+                print('Test error: %.2f%%' % test_err)
                 print('Learning rate:', lr)
                 print('train_loss:', train_loss)
-                print('semi_loss:', semi_loss)
+                print('walker_loss_aba:', aba_loss)
+                print('visit_loss:', visit_loss)
                 print('logit_loss:', logit_loss)
                 print('Image shape:', IMAGE_SHAPE)
                 print('emb_size: ', FLAGS.emb_size)
@@ -241,6 +244,9 @@ def main(_):
                 print('decay_steps: ', FLAGS.decay_steps)
                 print('decay_factor: ', FLAGS.decay_factor)
                 print('warmup_steps: ', FLAGS.warmup_steps)
+                print('walker_weight: ', FLAGS.walker_weight)
+                print('visit_weight: ', FLAGS.visit_weight)
+                print('logit_weight: ', FLAGS.logit_weight)
                 print('=======================\n')
 
 

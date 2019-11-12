@@ -403,7 +403,7 @@ class SemisupModel(object):
         else:
             self.add_visit_loss(p_ab, visit_weight)
 
-        tf.summary.scalar('Loss_aba'+name, loss_aba)
+        tf.summary.scalar('Walker_loss_aba'+name, loss_aba)
 
         return loss_aba
 
@@ -508,6 +508,7 @@ class SemisupModel(object):
                 tf.log(1e-8 + visit_probability),
                 weights=weight,
                 scope='loss_visit' + name)
+        self.visit_loss = visit_loss
 
         tf.summary.scalar('Loss_Visit' + name, visit_loss)
 
