@@ -10,6 +10,8 @@ from __future__ import division
 from __future__ import print_function
 from datetime import datetime
 
+import sys
+import time
 import random
 import tensorflow as tf
 
@@ -22,13 +24,13 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-IMAGE_SHAPE = [96, 96, 3]
+IMAGE_SHAPE = [227, 227, 3]
 
 flags.DEFINE_integer('emb_size', 512, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 5,
+flags.DEFINE_integer('sup_per_class', 10,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -61,11 +63,11 @@ flags.DEFINE_float('dropout_keep_prob', 0.5, 'Dropout factor.')
 flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization')
 
 flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
-flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
+flags.DEFINE_integer('max_steps', 10000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', './', 'Training log path.')
+flags.DEFINE_string('logdir', '../', 'Training log path.')
 
-flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
@@ -190,9 +192,13 @@ def main(_):
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
             
+            step_start_time = time.time()
             _, summaries, train_loss, semi_loss, logit_loss = sess.run([train_op, summary_op, model.train_loss, model.loss_aba, t_logit_loss], {
               t_learning_rate: lr
             })
+
+            sys.stdout.write("\rstep: %d, Step time: %.4f sec" % (step, (time.time() - step_start_time)))
+            sys.stdout.flush()
             # sup_images = sess.run(d_sup_images)
             # sup_labels = sess.run(d_sup_labels)
             # sup_emb = sess.run(t_sup_emb)
@@ -201,8 +207,9 @@ def main(_):
             # train_loss = sess.run(model.train_loss)
             # _ = sess.run(train_op, {t_learning_rate: lr})
 
+
             if (step + 1) % FLAGS.eval_interval == 0 or step == 99 or step == 0:
-                print('=======================')
+                print('\n=======================')
                 print('Step: %d' % step)
                 test_pred = model.classify(test_images, sess).argmax(-1)
                 conf_mtx = semisup.confusion_matrix(test_labels, test_pred, NUM_LABELS)
@@ -221,6 +228,8 @@ def main(_):
                     print('unsup_batch_size: ', FLAGS.unsup_batch_size)
                 print('semisup: ', FLAGS.semisup)
                 print('augmentation: ', FLAGS.augmentation)
+                print('=======================\n')
+
 
                 if FLAGS.logdir is not None:
                     sum_values = {
