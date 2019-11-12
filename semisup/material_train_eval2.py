@@ -65,7 +65,7 @@ flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', './', 'Training log path.')
 
-flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
@@ -87,7 +87,10 @@ image_shape = IMAGE_SHAPE
 
 def main(_):
     if FLAGS.logdir is not None:
-        FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+        # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+        _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
+        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}".format(FLAGS.logdir, image_shape[0], FLAGS.emb_size, FLAGS.sup_per_class, _unsup_batch_size)
+
 
     # Load image data from npy file
     train_images, test_images, train_labels, test_labels = dataset_tools.get_data(one_hot=False, test_size=FLAGS.test_size, image_shape=image_shape)
