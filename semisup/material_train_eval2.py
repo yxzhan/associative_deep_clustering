@@ -31,7 +31,7 @@ flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 50,
+flags.DEFINE_integer('sup_per_class', 30,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -53,7 +53,7 @@ flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_integer('decay_steps', 2000,
+flags.DEFINE_integer('decay_steps', 1000,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 0.5, 'Weight for visit loss.')
@@ -67,9 +67,12 @@ flags.DEFINE_integer('warmup_steps', 0, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 10000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', '../', 'Training log path.')
+
+flags.DEFINE_string('restore_checkpoint', None, 'restore weights from checkpoint, e.g. some autoencoder pretraining')
+
 flags.DEFINE_bool('run_in_background', False, 'run in background')
 
-flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
@@ -93,7 +96,7 @@ def main(_):
     if FLAGS.logdir is not None:
         # FLAGS.logdir = FLAGS.logdir + '/t_' + datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         _unsup_batch_size = FLAGS.unsup_batch_size if FLAGS.semisup else 0
-        FLAGS.logdir = "{0}/t_img{1}_emb{2}_sup{3}_un{4}_decay{5}_{6}_warm{7}".format(FLAGS.logdir, image_shape[0], 
+        FLAGS.logdir = "{0}/i{1}_e{2}_s{3}_un{4}_d{5}_{6}_w{7}".format(FLAGS.logdir, image_shape[0], 
                                             FLAGS.emb_size, FLAGS.sup_per_class,
                                             _unsup_batch_size, FLAGS.decay_steps,
                                             int(FLAGS.decay_factor*100), FLAGS.warmup_steps)
@@ -173,6 +176,8 @@ def main(_):
             model.visit_loss = tf.constant(0)
 
         t_logit_loss = model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
+        # t_logit_loss = tf.constant(0)
+
 
         #model.add_emb_regularization(t_sup_emb, weight=FLAGS.l1_weight)
 
@@ -194,6 +199,10 @@ def main(_):
 
         tf.global_variables_initializer().run()
 
+        if FLAGS.restore_checkpoint is not None:
+            variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='net')
+            restorer = tf.train.Saver(var_list=variables)
+            restorer.restore(sess, FLAGS.restore_checkpoint)
 
         learning_rate_ = FLAGS.learning_rate
 
@@ -212,13 +221,7 @@ def main(_):
             if not FLAGS.run_in_background:
                 sys.stderr.write("\rstep: %d, Step time: %.4f sec" % (step, (time.time() - step_start_time)))
                 sys.stdout.flush()
-            # sup_images = sess.run(d_sup_images)
-            # sup_labels = sess.run(d_sup_labels)
-            # sup_emb = sess.run(t_sup_emb)
-            # sup_logit = sess.run(t_sup_logit)
-            # logit_loss = sess.run(logit_loss)
-            # train_loss = sess.run(model.train_loss)
-            # _ = sess.run(train_op, {t_learning_rate: lr})
+            # sup_images = sess.run(d_sup_image
 
 
             if (step + 1) % FLAGS.eval_interval == 0 or step == 99 or step == 0:
@@ -257,12 +260,15 @@ def main(_):
                     sum_values = {
                         'Test error': test_err
                     }
-                    # summary_writer.add_summary(summaries, step)
+                    summary_writer.add_summary(summaries, step)
                     for key, value in sum_values.items():
                         summary = tf.Summary(
                                 value=[tf.Summary.Value(tag=key, simple_value=value)])
                         summary_writer.add_summary(summary, step)
 
+            if FLAGS.logdir is not None and (step + 1) % 5000 == 0:
+                path = saver.save(sess, FLAGS.logdir + '/checkpoint', model.step)
+                print('@@model_path:%s' % path)
 
             if step % FLAGS.decay_steps == 0 and step > 0:
                 learning_rate_ = learning_rate_ * FLAGS.decay_factor

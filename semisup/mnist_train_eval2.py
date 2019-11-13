@@ -26,6 +26,10 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import random
+import sys
+import shutil
+
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import semisup
@@ -35,7 +39,7 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('sup_per_class', 5,
+flags.DEFINE_integer('sup_per_class', 10,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -67,9 +71,9 @@ flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization
 flags.DEFINE_integer('warmup_steps', 1000, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', None, 'Training log path.')
+flags.DEFINE_string('logdir', '../', 'Training log path.')
 
-flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 
@@ -81,6 +85,13 @@ IMAGE_SHAPE = mnist_tools.IMAGE_SHAPE
 
 
 def main(_):
+    if FLAGS.logdir is not None:
+        FLAGS.logdir = FLAGS.logdir + '/t_mnist_eval'
+        try:
+            shutil.rmtree(FLAGS.logdir)
+        except OSError as e:
+            print ("Error: %s - %s." % (e.filename, e.strerror))
+
     train_images, train_labels = mnist_tools.get_data('train')
     test_images, test_labels = mnist_tools.get_data('test')
 
@@ -130,6 +141,10 @@ def main(_):
 
         train_op = model.create_train_op(t_learning_rate)
 
+        summary_op = tf.summary.merge_all()
+        if FLAGS.logdir is not None:
+            summary_writer = tf.summary.FileWriter(FLAGS.logdir, graph)
+            saver = tf.train.Saver()
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
@@ -144,22 +159,34 @@ def main(_):
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
 
-            _ = sess.run([train_op], {
+            _, summaries = sess.run([train_op, summary_op], {
               t_learning_rate: lr
             })
+
+            sys.stderr.write("\rstep: %d" % step)
+            sys.stdout.flush()
+    
             if (step + 1) % FLAGS.eval_interval == 0 or step == 99:
-                print('Step: %d' % step)
+                print('\nStep: %d' % step)
                 test_pred = model.classify(test_images, sess).argmax(-1)
                 conf_mtx = semisup.confusion_matrix(test_labels, test_pred, NUM_LABELS)
                 test_err = (test_labels != test_pred).mean() * 100
                 print(conf_mtx)
                 print('Test error: %.2f %%' % test_err)
-                print()
 
+    
+                if FLAGS.logdir is not None:
+                    sum_values = {
+                    'Test error': test_err
+                }
+                summary_writer.add_summary(summaries, step)
+                for key, value in sum_values.items():
+                    summary = tf.Summary(
+                            value=[tf.Summary.Value(tag=key, simple_value=value)])
+                    summary_writer.add_summary(summary, step)
 
             if step % FLAGS.decay_steps == 0 and step > 0:
                 learning_rate_ = learning_rate_ * FLAGS.decay_factor
-
 
         coord.request_stop()
         coord.join(threads)

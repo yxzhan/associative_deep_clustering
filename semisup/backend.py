@@ -174,7 +174,6 @@ def sample_by_label_v2(images, labels, n_per_label, num_labels, seed=None):
         y.extend([i] * n_per_label)
     return np.asarray(x), np.asarray(y)
 
-
 def create_virt_emb(n, size):
     """Create virtual embeddings."""
     emb = slim.variables.model_variable(name='virt_emb',
@@ -545,7 +544,6 @@ class SemisupModel(object):
 
     def add_logit_loss(self, logits, labels, weight=1.0, smoothing=0.0):
         """Add supervised classification loss to the model."""
-
         logit_loss = tf.losses.softmax_cross_entropy(
                 tf.one_hot(labels, logits.get_shape()[-1]),
                 logits,
