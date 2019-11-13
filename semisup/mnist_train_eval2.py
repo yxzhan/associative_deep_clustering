@@ -35,7 +35,7 @@ from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('sup_per_class', 2,
+flags.DEFINE_integer('sup_per_class', 5,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -54,7 +54,7 @@ flags.DEFINE_float('learning_rate', 1e-3, 'Initial learning rate.')
 
 flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_float('decay_steps', 5000,
+flags.DEFINE_float('decay_steps', 2000,
                    'Learning rate decay interval in steps.')
 
 flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
@@ -67,9 +67,9 @@ flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization
 flags.DEFINE_integer('warmup_steps', 1000, 'Number of training steps.')
 flags.DEFINE_integer('max_steps', 20000, 'Number of training steps.')
 
-flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
+flags.DEFINE_string('logdir', None, 'Training log path.')
 
-flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 
 print(FLAGS.learning_rate, FLAGS.__flags)  # print all flags (useful when logging)
 

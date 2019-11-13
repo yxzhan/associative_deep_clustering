@@ -31,7 +31,7 @@ flags.DEFINE_integer('emb_size', 128, 'Dimension of embedding space')
 
 flags.DEFINE_float('test_size', 0.3, 'Test data portion')
 
-flags.DEFINE_integer('sup_per_class', 30,
+flags.DEFINE_integer('sup_per_class', 50,
                      'Number of labeled samples used per class.')
 
 flags.DEFINE_integer('sup_seed', -1,  #-1 -> choose randomly   -2 -> use sup_per_class as seed
@@ -51,14 +51,14 @@ flags.DEFINE_string('architecture', 'alexnet_model', 'Which network architecture
 
 flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
 
-flags.DEFINE_float('decay_factor', 0.6, 'Learning rate decay factor.')
+flags.DEFINE_float('decay_factor', 0.33, 'Learning rate decay factor.')
 
-flags.DEFINE_integer('decay_steps', 1000,
+flags.DEFINE_integer('decay_steps', 2000,
                    'Learning rate decay interval in steps.')
 
-flags.DEFINE_float('visit_weight', 1.0, 'Weight for visit loss.')
+flags.DEFINE_float('visit_weight', 0.5, 'Weight for visit loss.')
 
-flags.DEFINE_float('walker_weight', 1.0, 'Weight for walker loss.')
+flags.DEFINE_float('walker_weight', 0.5, 'Weight for walker loss.')
 flags.DEFINE_float('logit_weight', 1.0, 'Weight for logits')
 flags.DEFINE_float('dropout_keep_prob', 0.5, 'Dropout factor.')
 flags.DEFINE_float('l1_weight', 0.0002, 'Weight for l1 embeddding regularization')
@@ -69,7 +69,7 @@ flags.DEFINE_integer('max_steps', 10000, 'Number of training steps.')
 flags.DEFINE_string('logdir', '../', 'Training log path.')
 flags.DEFINE_bool('run_in_background', False, 'run in background')
 
-flags.DEFINE_bool('semisup', True, 'Add unsupervised samples')
+flags.DEFINE_bool('semisup', False, 'Add unsupervised samples')
 
 flags.DEFINE_bool('augmentation', True,
                   'Apply data augmentation during training.')
@@ -109,7 +109,7 @@ def main(_):
     unique, counts = np.unique(test_labels, return_counts=True)
     testset_distribution = dict(zip(unique, counts))
 
-    train_X, train_Y = semisup.sample_by_label(train_images, train_labels,
+    train_X, train_Y = semisup.sample_by_label_v2(train_images, train_labels,
                                            FLAGS.sup_per_class, NUM_LABELS, np.random.randint(0, 100))
 
     def aug(image, label):
@@ -170,6 +170,7 @@ def main(_):
             #model.add_emb_regularization(t_unsup_emb, weight=FLAGS.l1_weight)
         else:
             model.loss_aba = tf.constant(0)
+            model.visit_loss = tf.constant(0)
 
         t_logit_loss = model.add_logit_loss(t_sup_logit, t_sup_labels, weight=FLAGS.logit_weight)
 
@@ -200,7 +201,7 @@ def main(_):
             lr = learning_rate_
             if step < FLAGS.warmup_steps:
                 lr = 1e-6 + semisup.apply_envelope("log", step, FLAGS.learning_rate, FLAGS.warmup_steps, 0)
-            
+
             step_start_time = time.time()
             _, summaries, train_loss, aba_loss, visit_loss, logit_loss = sess.run([train_op, summary_op, 
                                                     model.train_loss, model.loss_aba, 
@@ -231,8 +232,9 @@ def main(_):
                 print('Test error: %.2f%%' % test_err)
                 print('Learning rate:', lr)
                 print('train_loss:', train_loss)
-                print('walker_loss_aba:', aba_loss)
-                print('visit_loss:', visit_loss)
+                if FLAGS.semisup:
+                    print('walker_loss_aba:', aba_loss)
+                    print('visit_loss:', visit_loss)
                 print('logit_loss:', logit_loss)
                 print('Image shape:', IMAGE_SHAPE)
                 print('emb_size: ', FLAGS.emb_size)
@@ -244,22 +246,18 @@ def main(_):
                 print('decay_steps: ', FLAGS.decay_steps)
                 print('decay_factor: ', FLAGS.decay_factor)
                 print('warmup_steps: ', FLAGS.warmup_steps)
-                print('walker_weight: ', FLAGS.walker_weight)
-                print('visit_weight: ', FLAGS.visit_weight)
+                if FLAGS.semisup:
+                    print('walker_weight: ', FLAGS.walker_weight)
+                    print('visit_weight: ', FLAGS.visit_weight)
                 print('logit_weight: ', FLAGS.logit_weight)
                 print('=======================\n')
 
 
                 if FLAGS.logdir is not None:
                     sum_values = {
-                        'Test error': test_err,
-                        # 'Learning rate': lr,
-                        # 'train_loss': train_loss,
-                        # 'semi_loss': semi_loss,
-                        'logit_loss': logit_loss
+                        'Test error': test_err
                     }
-
-                    summary_writer.add_summary(summaries, step)
+                    # summary_writer.add_summary(summaries, step)
                     for key, value in sum_values.items():
                         summary = tf.Summary(
                                 value=[tf.Summary.Value(tag=key, simple_value=value)])
